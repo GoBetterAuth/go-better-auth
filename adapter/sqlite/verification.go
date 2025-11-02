@@ -39,7 +39,7 @@ func (r *VerificationRepository) Create(v *verification.Verification) error {
 		slog.Debug("executing query", "query", query)
 	}
 
-	_, err := r.db.Exec(query, v.ID, v.UserID, v.Identifier, v.Token, v.Type, v.ExpiresAt, v.CreatedAt, v.UpdatedAt)
+	_, err := r.db.Exec(query, v.UserID, v.Identifier, v.Token, v.Type, v.ExpiresAt, v.CreatedAt, v.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to create verification: %w", err)
 	}
