@@ -104,7 +104,7 @@ func (r *VerificationRepository) FindByToken(token string) (*verification.Verifi
 // FindByHashedToken retrieves a verification record by matching a plain token against a hashed token
 func (r *VerificationRepository) FindByHashedToken(plainToken string) (*verification.Verification, error) {
 	query := `
-		SELECT id, user_id, identifier, token, type, expires_at, created_at, updated_at
+		SELECT user_id, identifier, token, type, expires_at, created_at, updated_at
 		FROM verifications
 		ORDER BY created_at DESC
 	`
@@ -122,7 +122,7 @@ func (r *VerificationRepository) FindByHashedToken(plainToken string) (*verifica
 	for rows.Next() {
 		var v verification.Verification
 		err := rows.Scan(
-			&v.ID, &v.UserID, &v.Identifier, &v.Token, &v.Type, &v.ExpiresAt, &v.CreatedAt, &v.UpdatedAt,
+			&v.UserID, &v.Identifier, &v.Token, &v.Type, &v.ExpiresAt, &v.CreatedAt, &v.UpdatedAt,
 		)
 		if err != nil {
 			continue
