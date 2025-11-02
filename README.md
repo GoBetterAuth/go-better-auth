@@ -1,6 +1,6 @@
 # Go Better Auth 🔐
 
-A comprehensive, framework-agnostic authentication and authorization library for Go, inspired by [Better Auth](https://better-auth.com).
+A comprehensive, framework-agnostic authentication and authorization library for Go.
 
 **Note:** This project is still a work in progress. Contributions are most welcome!
 
@@ -943,5 +943,9 @@ Apache 2.0 License - see LICENSE file for details
 
 - GitHub Issues: [Report bugs or request features](https://github.com/GoBetterAuth/go-better-auth/issues)
 - Documentation: [Full documentation](https://github.com/GoBetterAuth/go-better-auth/wiki)
+
+## Extra notes:
+
+This project was inspired by [Better Auth](https://better-auth.com) but it is not a direct port of it. In the near future the API may change and we have our own roadmap and plans to implement many new features.
 
 ---
