@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/domain/security"
@@ -20,6 +21,7 @@ const (
 // SecondaryStorageBruteForceRepository implements security.BruteForceRepository using secondary storage
 type SecondaryStorageBruteForceRepository struct {
 	storage storage.SecondaryStorage
+	mu      sync.Mutex // Protects concurrent access to attempt recording
 }
 
 // NewSecondaryStorageBruteForceRepository creates a new brute force repository using secondary storage
@@ -31,6 +33,10 @@ func NewSecondaryStorageBruteForceRepository(storage storage.SecondaryStorage) *
 
 // RecordAttempt records a failed login attempt for an email
 func (r *SecondaryStorageBruteForceRepository) RecordAttempt(email, ipAddress string) error {
+	// Use mutex to ensure atomic read-modify-write operations
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	ctx := context.Background()
 
 	// Record email attempt

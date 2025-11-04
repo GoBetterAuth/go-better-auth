@@ -296,26 +296,16 @@ func TestLimiter_CheckWithAlgorithm_SlidingWindow(t *testing.T) {
 		t.Error("expected request to be blocked when limit reached")
 	}
 
-	// Wait for 2 seconds to move to next window (window slot changes)
-	time.Sleep(2100 * time.Millisecond)
+	// Wait for the window to advance significantly (75% into the next window)
+	// This ensures more predictable timing for the sliding window calculation
+	time.Sleep(3500 * time.Millisecond) // 1.5 seconds past the window boundary
 
-	// Now we're in window slot 1. The weighted count calculation:
-	// - Previous window (slot 0): 5 requests
-	// - Current window (slot 1): 0 requests
-	// - Percentage in current: ~0% (just transitioned)
-	// - Percentage in previous: ~100%
-	// - Weighted count: 5 * 1.0 + 0 = 5.0
-	// We're still at the limit, so first request in new window should be blocked
-
-	// But as we progress into the new window, previous weight decreases
-	// Wait a bit more to allow some room
-	time.Sleep(500 * time.Millisecond)
-
-	// Now: elapsed ~500ms into 2s window = 25% through
-	// Weighted: 5 * 0.75 + 0 = 3.75 (casted to 3)
-	// Should have room for 2 more requests
+	// At this point we should be well into the new window:
+	// - Previous window contribution should be minimal (~25% or less)
+	// - Weighted count: 5 * 0.25 + 0 = 1.25 (casted to 1)
+	// - Should have room for 4 more requests (5 - 1 = 4)
 	successCount := 0
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 4; i++ {
 		_, allowed, err := limiter.CheckWithAlgorithm(ctx, key, window, max, "sliding-window")
 		if err != nil {
 			t.Fatalf("expected no error on mid-window request %d, got %v", i+1, err)
@@ -323,13 +313,15 @@ func TestLimiter_CheckWithAlgorithm_SlidingWindow(t *testing.T) {
 		if allowed {
 			successCount++
 		} else {
+			// Log some debug info if we get blocked unexpectedly
+			t.Logf("Request %d was blocked, stopping test", i+1)
 			break
 		}
 	}
 
-	// We expect at least 1-2 requests to succeed due to the sliding window effect
-	if successCount < 1 {
-		t.Errorf("expected at least 1 request to succeed in mid-window, got %d", successCount)
+	// With more generous timing, we should get at least 2-3 requests through
+	if successCount < 2 {
+		t.Errorf("expected at least 2 requests to succeed in mid-window, got %d", successCount)
 	}
 }
 

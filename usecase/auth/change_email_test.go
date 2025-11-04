@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/domain/user"
-	"github.com/GoBetterAuth/go-better-auth/repository/memory"
+	gobetterauthtests "github.com/GoBetterAuth/go-better-auth/tests"
 )
 
 func TestChangeEmail(t *testing.T) {
@@ -115,14 +115,14 @@ func TestChangeEmail(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			userRepo := memory.NewUserRepository()
-			verificationRepo := memory.NewVerificationRepository()
+			repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+			defer cleanup()
 
 			// Setup user with consistent ID
 			testUserID := "test-user-id"
 			if tt.setupUser != nil {
 				tt.setupUser.ID = testUserID
-				if err := userRepo.Create(tt.setupUser); err != nil {
+				if err := repos.UserRepo.Create(tt.setupUser); err != nil {
 					t.Fatalf("failed to setup user: %v", err)
 				}
 				// Update request with actual user ID
@@ -134,16 +134,18 @@ func TestChangeEmail(t *testing.T) {
 			// Setup additional users with different IDs
 			for i, u := range tt.setupUsers {
 				u.ID = "test-other-user-" + string(rune(i))
-				if err := userRepo.Create(u); err != nil {
+				if err := repos.UserRepo.Create(u); err != nil {
 					t.Fatalf("failed to setup user: %v", err)
 				}
 			}
 
-			svc := &Service{
-				config:           createTestConfig(),
-				userRepo:         userRepo,
-				verificationRepo: verificationRepo,
-			}
+			svc := NewService(
+				gobetterauthtests.CreateTestConfig(),
+				repos.UserRepo,
+				repos.SessionRepo,
+				repos.AccountRepo,
+				repos.VerificationRepo,
+			)
 
 			svc.config.User.ChangeEmail.Enabled = true
 

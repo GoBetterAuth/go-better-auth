@@ -7,12 +7,41 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/domain"
-	"github.com/GoBetterAuth/go-better-auth/repository/memory"
-	"github.com/GoBetterAuth/go-better-auth/usecase/auth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/GoBetterAuth/go-better-auth/domain"
+	"github.com/GoBetterAuth/go-better-auth/repository/gorm"
+	gobetterauthtests "github.com/GoBetterAuth/go-better-auth/tests"
+	"github.com/GoBetterAuth/go-better-auth/usecase/auth"
 )
+
+// setupTestRepositories creates GORM repositories with SQLite in-memory database for testing
+func setupTestRepositories(t *testing.T) *gorm.Repositories {
+	t.Helper()
+
+	cfg := &gorm.Config{
+		Provider:         "sqlite",
+		ConnectionString: ":memory:",
+		LogQueries:       false,
+	}
+
+	repos, err := gorm.NewRepositories(cfg)
+	require.NoError(t, err, "Failed to create test repositories")
+
+	// Run migrations
+	err = gobetterauthtests.RunTestMigrations(t, repos)
+	require.NoError(t, err, "Failed to run test migrations")
+
+	// Clean up after test
+	t.Cleanup(func() {
+		if repos != nil {
+			repos.Close()
+		}
+	})
+
+	return repos
+}
 
 // ===== Context Tests =====
 
@@ -80,12 +109,15 @@ func TestGetSessionToken_Missing(t *testing.T) {
 
 func TestAuthMiddleware_ValidBearerToken(t *testing.T) {
 	// Setup
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := auth.NewService(
 		&domain.Config{},
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	// Create a user and sign in to get a session
@@ -124,12 +156,15 @@ func TestAuthMiddleware_ValidBearerToken(t *testing.T) {
 }
 
 func TestAuthMiddleware_MissingToken(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := auth.NewService(
 		&domain.Config{},
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	middleware := NewAuthMiddleware(service)
@@ -146,12 +181,15 @@ func TestAuthMiddleware_MissingToken(t *testing.T) {
 }
 
 func TestAuthMiddleware_InvalidToken(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := auth.NewService(
 		&domain.Config{},
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	middleware := NewAuthMiddleware(service)
@@ -169,12 +207,15 @@ func TestAuthMiddleware_InvalidToken(t *testing.T) {
 }
 
 func TestAuthMiddleware_InvalidBearerFormat(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := auth.NewService(
 		&domain.Config{},
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	middleware := NewAuthMiddleware(service)
@@ -193,12 +234,15 @@ func TestAuthMiddleware_InvalidBearerFormat(t *testing.T) {
 
 func TestAuthMiddleware_CookieToken(t *testing.T) {
 	// Setup
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := auth.NewService(
 		&domain.Config{},
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	// Create a user and sign in to get a session
@@ -241,12 +285,15 @@ func TestAuthMiddleware_CookieToken(t *testing.T) {
 
 func TestAuthMiddleware_HandlerFunc(t *testing.T) {
 	// Setup
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := auth.NewService(
 		&domain.Config{},
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	// Create a user and sign in
@@ -291,12 +338,15 @@ func TestAuthMiddleware_HandlerFunc(t *testing.T) {
 
 func TestOptionalAuthMiddleware_ValidToken(t *testing.T) {
 	// Setup
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := auth.NewService(
 		&domain.Config{},
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	// Create a user and sign in
@@ -334,12 +384,15 @@ func TestOptionalAuthMiddleware_ValidToken(t *testing.T) {
 }
 
 func TestOptionalAuthMiddleware_NoToken(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := auth.NewService(
 		&domain.Config{},
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	middleware := NewOptionalAuthMiddleware(service)
@@ -359,12 +412,15 @@ func TestOptionalAuthMiddleware_NoToken(t *testing.T) {
 }
 
 func TestOptionalAuthMiddleware_InvalidToken(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := auth.NewService(
 		&domain.Config{},
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	middleware := NewOptionalAuthMiddleware(service)
@@ -386,12 +442,15 @@ func TestOptionalAuthMiddleware_InvalidToken(t *testing.T) {
 
 func TestAuthMiddleware_SetSessionTokenInContext(t *testing.T) {
 	// Setup
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := auth.NewService(
 		&domain.Config{},
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	// Create a user and sign in
@@ -432,12 +491,15 @@ func TestAuthMiddleware_SetSessionTokenInContext(t *testing.T) {
 
 func TestAuthMiddleware_ExpiredSession(t *testing.T) {
 	// Setup
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := auth.NewService(
 		&domain.Config{},
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	// Create a user and sign in
@@ -454,12 +516,14 @@ func TestAuthMiddleware_ExpiredSession(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Manually expire the session by waiting or skip this test
-	// In a real test, you'd directly modify the session in the repository
+	// Manually expire the session by updating it in the repository
+	token := signinResp.Session.Token
+
+	// Update the session to be expired
 	sess := signinResp.Session
 	sess.ExpiresAt = time.Now().Add(-1 * time.Hour)
-
-	token := signinResp.Session.Token
+	err = repos.SessionRepo.Update(sess)
+	require.NoError(t, err)
 
 	// Create middleware
 	middleware := NewAuthMiddleware(service)

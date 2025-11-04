@@ -1,8 +1,12 @@
-.PHONY: help build run test clean install migrate-up migrate-down docker-build docker-run
+.PHONY: help build run test clean install setup
+.PHONY: test test-coverage
+.PHONY: lint fmt vet deps-update all check quick-check ci
 
 # Variables
 APP_NAME=go-better-auth
 BINARY_PATH=./bin/$(APP_NAME)
+SQLITE_DB?=app.db
+POSTGRES_URL?=host=localhost user=postgres dbname=gobetterauth sslmode=disable
 
 # Help command
 help: ## Display this help screen
@@ -14,35 +18,25 @@ build: ## Build the package (library)
 	@go build ./...
 	@echo "Build complete!"
 
-build-linux: ## Build example for Linux (if main.go exists)
-	@echo "Building for Linux..."
-	@[ -f cmd/main.go ] && GOOS=linux GOARCH=amd64 go build -o $(BINARY_PATH)-linux ./cmd || echo "No cmd/main.go found"
-
-build-windows: ## Build example for Windows (if main.go exists)
-	@echo "Building for Windows..."
-	@[ -f cmd/main.go ] && GOOS=windows GOARCH=amd64 go build -o $(BINARY_PATH).exe ./cmd || echo "No cmd/main.go found"
-
-build-mac: ## Build example for macOS (if main.go exists)
-	@echo "Building for macOS..."
-	@[ -f cmd/main.go ] && GOOS=darwin GOARCH=amd64 go build -o $(BINARY_PATH)-mac ./cmd || echo "No cmd/main.go found"
+build-cli: ## Build CLI tool
+	@echo "Building CLI tool..."
+	@[ -f cmd/cli/main.go ] && go build -o $(BINARY_PATH)-cli ./cmd/cli || echo "No cmd/cli/main.go found"
 
 # Run commands
 run: ## Run example (if cmd/main.go exists)
 	@[ -f cmd/main.go ] && go run ./cmd || echo "No cmd/main.go found. This is a library package."
 
-dev: ## Run with hot reload (requires air)
-	@air
-
 # Test commands
-test: ## Run tests
+test: ## Run all tests
 	@echo "Running tests..."
-	@CGO_ENABLED=1 go test -failfast -v ./...
+	@CGO_ENABLED=1 go test -v ./...
 
-test-coverage: ## Run tests with coverage
+test-coverage: ## Run tests with coverage report
 	@echo "Running tests with coverage..."
 	@CGO_ENABLED=1 go test -v -coverprofile=coverage.out ./...
 	@go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
+	@go tool cover -func=coverage.out | grep total | awk '{print "Total coverage: " $$3}'
 
 # Dependency management
 install: ## Install dependencies
@@ -75,15 +69,21 @@ vet: ## Run go vet
 	@echo "Running go vet..."
 	@go vet ./...
 
-# Generate commands
-generate: ## Generate code (mocks, etc.)
-	@echo "Generating code..."
-	@go generate ./...
+# Development setup
+setup: install ## Setup development environment
+	@echo "Setting up development environment..."
+	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	@go install github.com/cosmtrek/air@latest
+	@echo "Development environment setup complete!"
 
 # All-in-one commands
 all: clean install build check ## Clean, install deps, build, and run all checks
 
 check: fmt vet lint test ## Run all checks (format, vet, lint, test)
+
+quick-check: fmt vet test ## Run quick checks (format, vet, fast tests)
+
+ci: clean install check ## CI pipeline (clean, install, check)
 
 # Default target
 .DEFAULT_GOAL := help

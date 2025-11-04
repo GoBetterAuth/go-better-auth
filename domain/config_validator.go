@@ -134,28 +134,28 @@ func validateURL(urlStr string) error {
 
 // validateDatabaseConfig validates database configuration
 func validateDatabaseConfig(config *DatabaseConfig) error {
-	if config.Provider == "" && config.DB == nil {
-		return fmt.Errorf("either Provider or DB must be set")
+	if config.Provider == "" {
+		return fmt.Errorf("Provider is required")
 	}
 
-	if config.Provider != "" {
-		provider := strings.ToLower(config.Provider)
-		if provider != "sqlite" && provider != "postgres" {
-			return fmt.Errorf("unsupported provider: %s (supported: sqlite, postgres)", provider)
-		}
-
-		if provider == "sqlite" || provider == "postgres" {
-			if config.ConnectionString == "" && config.DB == nil {
-				return fmt.Errorf("%s provider requires ConnectionString or DB", provider)
-			}
-		}
+	provider := strings.ToLower(config.Provider)
+	if provider != "sqlite" && provider != "postgres" {
+		return fmt.Errorf("unsupported provider: %s (supported: sqlite, postgres)", provider)
 	}
 
-	if config.Casing != "" {
-		casing := strings.ToLower(config.Casing)
-		if casing != "snake" && casing != "camel" {
-			return fmt.Errorf("invalid casing: %s (supported: snake, camel)", casing)
-		}
+	if config.ConnectionString == "" {
+		return fmt.Errorf("ConnectionString is required")
+	}
+
+	// Validate connection pool settings
+	if config.MaxOpenConns < 0 {
+		return fmt.Errorf("MaxOpenConns must be non-negative")
+	}
+	if config.MaxIdleConns < 0 {
+		return fmt.Errorf("MaxIdleConns must be non-negative")
+	}
+	if config.ConnMaxLifetime < 0 {
+		return fmt.Errorf("ConnMaxLifetime must be non-negative")
 	}
 
 	return nil

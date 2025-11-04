@@ -5,32 +5,25 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/domain/account"
-	"github.com/GoBetterAuth/go-better-auth/domain/user"
-	"github.com/GoBetterAuth/go-better-auth/repository/memory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/GoBetterAuth/go-better-auth/domain/account"
+	gobetterauthtests "github.com/GoBetterAuth/go-better-auth/tests"
 )
 
 func TestLinkOAuthAccount_Success(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	ctx := context.Background()
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	sessionRepo := memory.NewSessionRepository()
-	verificationRepo := memory.NewVerificationRepository()
-
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	// Create a user
-	newUser := &user.User{
-		Name:      "Test User",
-		Email:     "test@example.com",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	err := userRepo.Create(newUser)
+	newUser := gobetterauthtests.CreateTestUser()
+	err := repos.UserRepo.Create(newUser)
 	require.NoError(t, err)
 
 	// Link OAuth account
@@ -51,15 +44,13 @@ func TestLinkOAuthAccount_Success(t *testing.T) {
 }
 
 func TestLinkOAuthAccount_UserNotFound(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	ctx := context.Background()
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	sessionRepo := memory.NewSessionRepository()
-	verificationRepo := memory.NewVerificationRepository()
-
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	req := &LinkOAuthAccountRequest{
 		UserID:      "non-existent-user",
@@ -75,24 +66,17 @@ func TestLinkOAuthAccount_UserNotFound(t *testing.T) {
 }
 
 func TestLinkOAuthAccount_AlreadyLinked(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	ctx := context.Background()
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	sessionRepo := memory.NewSessionRepository()
-	verificationRepo := memory.NewVerificationRepository()
-
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	// Create a user
-	newUser := &user.User{
-		Name:      "Test User",
-		Email:     "test@example.com",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	err := userRepo.Create(newUser)
+	newUser := gobetterauthtests.CreateTestUser()
+	err := repos.UserRepo.Create(newUser)
 	require.NoError(t, err)
 
 	// Link OAuth account first time
@@ -115,24 +99,17 @@ func TestLinkOAuthAccount_AlreadyLinked(t *testing.T) {
 }
 
 func TestUnlinkOAuthAccount_Success(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	ctx := context.Background()
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	sessionRepo := memory.NewSessionRepository()
-	verificationRepo := memory.NewVerificationRepository()
-
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	// Create a user
-	newUser := &user.User{
-		Name:      "Test User",
-		Email:     "test@example.com",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	err := userRepo.Create(newUser)
+	newUser := gobetterauthtests.CreateTestUser()
+	err := repos.UserRepo.Create(newUser)
 	require.NoError(t, err)
 
 	// Link OAuth account
@@ -164,24 +141,17 @@ func TestUnlinkOAuthAccount_Success(t *testing.T) {
 }
 
 func TestUnlinkOAuthAccount_NotLinked(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	ctx := context.Background()
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	sessionRepo := memory.NewSessionRepository()
-	verificationRepo := memory.NewVerificationRepository()
-
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	// Create a user
-	newUser := &user.User{
-		Name:      "Test User",
-		Email:     "test@example.com",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	err := userRepo.Create(newUser)
+	newUser := gobetterauthtests.CreateTestUser()
+	err := repos.UserRepo.Create(newUser)
 	require.NoError(t, err)
 
 	// Try to unlink a non-existent account
@@ -197,24 +167,17 @@ func TestUnlinkOAuthAccount_NotLinked(t *testing.T) {
 }
 
 func TestGetLinkedAccounts_Multiple(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	ctx := context.Background()
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	sessionRepo := memory.NewSessionRepository()
-	verificationRepo := memory.NewVerificationRepository()
-
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	// Create a user
-	newUser := &user.User{
-		Name:      "Test User",
-		Email:     "test@example.com",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	err := userRepo.Create(newUser)
+	newUser := gobetterauthtests.CreateTestUser()
+	err := repos.UserRepo.Create(newUser)
 	require.NoError(t, err)
 
 	// Link multiple OAuth accounts
@@ -250,24 +213,17 @@ func TestGetLinkedAccounts_Multiple(t *testing.T) {
 }
 
 func TestHasLinkedAccount_True(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	ctx := context.Background()
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	sessionRepo := memory.NewSessionRepository()
-	verificationRepo := memory.NewVerificationRepository()
-
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	// Create a user
-	newUser := &user.User{
-		Name:      "Test User",
-		Email:     "test@example.com",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	err := userRepo.Create(newUser)
+	newUser := gobetterauthtests.CreateTestUser()
+	err := repos.UserRepo.Create(newUser)
 	require.NoError(t, err)
 
 	// Link OAuth account
@@ -288,24 +244,17 @@ func TestHasLinkedAccount_True(t *testing.T) {
 }
 
 func TestHasLinkedAccount_False(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	ctx := context.Background()
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	sessionRepo := memory.NewSessionRepository()
-	verificationRepo := memory.NewVerificationRepository()
-
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	// Create a user
-	newUser := &user.User{
-		Name:      "Test User",
-		Email:     "test@example.com",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	err := userRepo.Create(newUser)
+	newUser := gobetterauthtests.CreateTestUser()
+	err := repos.UserRepo.Create(newUser)
 	require.NoError(t, err)
 
 	// Check if account exists (should be false)
@@ -315,24 +264,17 @@ func TestHasLinkedAccount_False(t *testing.T) {
 }
 
 func TestUpdateLinkedAccountTokens_Success(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	ctx := context.Background()
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	sessionRepo := memory.NewSessionRepository()
-	verificationRepo := memory.NewVerificationRepository()
-
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	// Create a user
-	newUser := &user.User{
-		Name:      "Test User",
-		Email:     "test@example.com",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	err := userRepo.Create(newUser)
+	newUser := gobetterauthtests.CreateTestUser()
+	err := repos.UserRepo.Create(newUser)
 	require.NoError(t, err)
 
 	// Link OAuth account
@@ -353,31 +295,24 @@ func TestUpdateLinkedAccountTokens_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify the tokens were updated
-	acc, err := accountRepo.FindByUserIDAndProvider(newUser.ID, account.ProviderGoogle)
+	acc, err := repos.AccountRepo.FindByUserIDAndProvider(newUser.ID, account.ProviderGoogle)
 	require.NoError(t, err)
 	assert.Equal(t, newAccessToken, *acc.AccessToken)
-	assert.Equal(t, expiresAt, *acc.AccessTokenExpiresAt)
+	assert.WithinDuration(t, expiresAt, *acc.AccessTokenExpiresAt, time.Second)
 }
 
 func TestUpdateLinkedAccountTokens_NotFound(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	ctx := context.Background()
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	sessionRepo := memory.NewSessionRepository()
-	verificationRepo := memory.NewVerificationRepository()
-
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	// Create a user
-	newUser := &user.User{
-		Name:      "Test User",
-		Email:     "test@example.com",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	err := userRepo.Create(newUser)
+	newUser := gobetterauthtests.CreateTestUser()
+	err := repos.UserRepo.Create(newUser)
 	require.NoError(t, err)
 
 	// Try to update tokens for a non-existent linked account

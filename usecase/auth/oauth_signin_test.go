@@ -5,22 +5,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/domain/account"
-	"github.com/GoBetterAuth/go-better-auth/repository/memory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/GoBetterAuth/go-better-auth/domain/account"
+	gobetterauthtests "github.com/GoBetterAuth/go-better-auth/tests"
 )
 
 func TestOAuthSignIn_NewUser(t *testing.T) {
 	ctx := context.Background()
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	sessionRepo := memory.NewSessionRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	// OAuth signin with new user
 	pictureURL := "https://example.com/photo.jpg"
@@ -69,14 +68,12 @@ func TestOAuthSignIn_NewUser(t *testing.T) {
 
 func TestOAuthSignIn_ExistingUser(t *testing.T) {
 	ctx := context.Background()
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	sessionRepo := memory.NewSessionRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	// Create existing user first via signup
 	signupReq := &SignUpRequest{
@@ -128,14 +125,12 @@ func TestOAuthSignIn_ExistingUser(t *testing.T) {
 
 func TestOAuthSignIn_ExistingUserExistingAccount(t *testing.T) {
 	ctx := context.Background()
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	sessionRepo := memory.NewSessionRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	// First OAuth signin - creates user and account
 	pictureURL := "https://example.com/photo.jpg"
@@ -199,14 +194,12 @@ func TestOAuthSignIn_ExistingUserExistingAccount(t *testing.T) {
 
 func TestOAuthSignIn_NilRequest(t *testing.T) {
 	ctx := context.Background()
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	sessionRepo := memory.NewSessionRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	resp, err := service.OAuthSignIn(ctx, nil)
 	assert.Error(t, err)
@@ -216,14 +209,12 @@ func TestOAuthSignIn_NilRequest(t *testing.T) {
 
 func TestOAuthSignIn_EmptyProviderID(t *testing.T) {
 	ctx := context.Background()
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	sessionRepo := memory.NewSessionRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	req := &OAuthSignInRequest{
 		ProviderID: "",
@@ -246,14 +237,12 @@ func TestOAuthSignIn_EmptyProviderID(t *testing.T) {
 
 func TestOAuthSignIn_NilOAuthUser(t *testing.T) {
 	ctx := context.Background()
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	sessionRepo := memory.NewSessionRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	req := &OAuthSignInRequest{
 		ProviderID:  account.ProviderGoogle,
@@ -269,14 +258,12 @@ func TestOAuthSignIn_NilOAuthUser(t *testing.T) {
 
 func TestOAuthSignIn_EmptyEmail(t *testing.T) {
 	ctx := context.Background()
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	sessionRepo := memory.NewSessionRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	req := &OAuthSignInRequest{
 		ProviderID: account.ProviderGoogle,
@@ -296,14 +283,12 @@ func TestOAuthSignIn_EmptyEmail(t *testing.T) {
 
 func TestOAuthSignIn_MultipleProviders(t *testing.T) {
 	ctx := context.Background()
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	sessionRepo := memory.NewSessionRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	// Sign in with Google first
 	googleReq := &OAuthSignInRequest{

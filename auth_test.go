@@ -1,30 +1,92 @@
 package gobetterauth
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
+	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/GoBetterAuth/go-better-auth/domain"
+	"github.com/GoBetterAuth/go-better-auth/infrastructure/migration"
+	gormrepo "github.com/GoBetterAuth/go-better-auth/repository/gorm"
 )
 
-func TestNew_Valid(t *testing.T) {
+// setupTestDatabase runs migrations on a temporary SQLite database and returns the connection string and cleanup function
+func setupTestDatabase(t *testing.T) (string, func()) {
+	t.Helper()
+
+	// Create a temporary database file
+	tmpFile, err := os.CreateTemp("", fmt.Sprintf("test_db_%d_*.db", time.Now().UnixNano()))
+	if err != nil {
+		t.Fatalf("failed to create temporary database file: %v", err)
+	}
+	dbPath := tmpFile.Name()
+	tmpFile.Close() // Close the file so SQLite can use it
+
+	cleanup := func() {
+		os.Remove(dbPath)
+	}
+
+	// Create repositories to get database connection
+	gormCfg := &gormrepo.Config{
+		Provider:         "sqlite",
+		ConnectionString: dbPath,
+		LogQueries:       false,
+	}
+
+	repos, err := gormrepo.NewRepositories(gormCfg)
+	if err != nil {
+		cleanup()
+		t.Fatalf("failed to create repositories: %v", err)
+	}
+
+	// Run migrations
+	err = migration.RunTestMigrations(repos.DB, "sqlite")
+	if err != nil {
+		repos.Close()
+		cleanup()
+		t.Fatalf("failed to run test migrations: %v", err)
+	}
+
+	// Close repositories - the Auth instance will create its own connection
+	repos.Close()
+
+	return dbPath, cleanup
+}
+
+// createTestAuth creates an Auth instance with a pre-migrated database
+func createTestAuth(t *testing.T) (*Auth, func()) {
+	t.Helper()
+
+	dbPath, cleanup := setupTestDatabase(t)
+
 	config := &domain.Config{
 		BaseURL: "http://localhost:8080",
 		Secret:  "very-secret-key-that-is-long-enough",
 		Database: domain.DatabaseConfig{
 			Provider:         "sqlite",
-			ConnectionString: ":memory:",
+			ConnectionString: dbPath,
 		},
 	}
 
 	auth, err := New(config)
-	// Note: This may fail if sqlite3 is not available due to CGO requirements
 	if err != nil {
-		t.Skip("sqlite adapter not available:", err)
+		cleanup()
+		t.Fatalf("failed to create auth instance: %v", err)
 	}
+
+	return auth, cleanup
+}
+
+func TestNew_ValidConfig(t *testing.T) {
+	auth, cleanup := createTestAuth(t)
+	defer cleanup()
+
 	assert.NotNil(t, auth)
 	assert.NotNil(t, auth.Config())
 	assert.NotNil(t, auth.SecretGenerator())

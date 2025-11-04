@@ -1,9 +1,5 @@
 ### General Guidelines
 
-- Always read the `PRD.md` files as a guide to know what the project is about.
-
-- Use Docker for everything.
-
 - Keep things loosely coupled.
 
 - Make sure to implement every feature until completion. Avoid creating mock data for features, implement everything with a real implementation.
@@ -17,11 +13,13 @@
 - Only use the `slog` package for logging. Configure it to output logs in a human-readable format.
 
 - Make sure the imports follow the following structure with spaces between each section:
+
   - Standard library imports
   - Third-party imports
   - Internal imports
 
 - Project Layout (Go Clean Architecture):
+
   - Organize the codebase into the following main layers:
     - `domain/`: Contains domain models (entities), domain-specific interfaces, and business rules. This layer is independent of frameworks and external libraries.
     - `usecase/`: Contains application-specific business logic (use cases) that orchestrate domain operations. Use cases depend only on the domain layer and define interfaces for repositories and external services.
@@ -35,39 +33,47 @@
   - Make sure to add relevant json tags to structs that will be serialized to/from JSON especially if it's part of the request/response lifecycle between the frontend and backend.
 
 - Modular Design:
+
   - Follow S.O.L.I.D principles and make sure that every feature and domain is separated into its own folder and relevant files. Make sure each code file is not very large and if needed separate it into multiple different files to make the code more readable, maintainable and testable. Always create interfaces to abstract away implementations and make the code loosely coupled.
 
 - Error handling:
+
   - Return Errors Explicitly: Go's idiomatic way is to return errors as the last return value.
   - Wrap Errors: Use fmt.Errorf with %w to wrap errors, preserving the original error context. This allows for programmatic inspection using errors.Is and errors.As.
 
 - Logging:
+
   - Structured Logging: Use structured loggers such as slog to output logs in a machine-readable format (JSON).
   - Contextual Logging: Pass a logger through the request context or as a dependency to functions, enriching logs with request-specific information (e.g., request ID, user ID).
   - Log Levels: Use appropriate log levels (DEBUG, INFO, WARN, ERROR, FATAL) for different severities.
 
 - Configuration Management:
+
   - Manage application settings effectively.
   - Config Variables: Always provide properties within the main Base Config struct for all configuration variables.
   - Strict Validation: Validate configuration values at startup to catch errors early.
 
 - Database Interactions
+
   - Efficient and safe database access.
   - Repository Pattern: Encapsulate database operations within a repository layer. This separates business logic from data access details and makes it easier to swap databases or ORMs.
-  - Use `database/sql`, but avoid using it directly in handlers. Instead, create a repository layer that abstracts database operations.
+  - Use `gorm` ORM, but avoid using it directly in handlers. Instead, create a repository layer that abstracts database operations.
   - Connection Pooling: Configure database connection pooling correctly to manage connections efficiently and prevent resource exhaustion.
   - Context for Database Operations: Always pass context. Context to database operations for timeout and cancellation.
   - Transactions: Use database transactions for operations that require atomicity (all or nothing).
 
 - Middleware:
+
   - Leverage the base net/http package for middleware.
 
 - Validation:
+
   - Ensure incoming data is valid.
   - Request Body Validation: Validate incoming JSON request bodies. Use libraries like `go-playground/validator/v10` for declarative validation.
   - Business Logic Validation: Perform additional validation within the service layer that depends on business rules or database lookups. Add the `validate:"required"` tag to struct fields to enforce required fields as well as other features that the validator provides.
 
 - Testing:
+
   - Write comprehensive tests.
   - Unit Tests: Test individual functions and components in isolation. Mock external dependencies (database, external APIs).
   - Integration Tests: Test interactions between different components (e.g., handler -> usecase -> repository -> database). Use a test database or Docker Compose for dependencies.
@@ -76,6 +82,7 @@
   - Make sure that the tests reflect production too so that the tests are relevant and meaningful.
 
 - Security:
+
   - Implement security best practices.
   - Input Sanitization: Sanitize all user inputs to prevent injection attacks (SQL injection, XSS).
   - Authentication & Authorization:
@@ -83,8 +90,10 @@
     - Implement robust authorization checks (role-based access control, attribute-based access control).
   - Rate Limiting: Protect the library from abuse and DDoS attacks using rate limiting.
   - Mocking: Use Go's interfaces to enable easy mocking of dependencies for unit testing. Libraries like stretchr/testify/mock can be helpful.
+  - DO NOT store plain text passwords/tokens in the DB. Always hash passwords using a strong hashing algorithm like bcrypt before storing them.
 
 - Dependency Management:
+
   - Manage external libraries and modules.
   - Go Modules: Use Go Modules for dependency management.
   - Pin Dependencies: Pin specific versions of dependencies to ensure reproducible builds.
@@ -92,6 +101,7 @@
   - Minimize Dependencies: Avoid unnecessary dependencies to reduce complexity and attack surface.
 
 - Concurrency:
+
   - Go's concurrency features are powerful but require careful handling.
   - Goroutines & Channels: Use goroutines for concurrent execution and channels for safe communication between goroutines.
   - Context for Cancellation: Always pass context.Context to goroutines that perform long-running operations, allowing for graceful cancellation.
@@ -99,6 +109,7 @@
   - Worker Pools: For CPU-bound or I/O-bound tasks, consider implementing worker pools to limit concurrent operations and manage resources.
 
 - Observability
+
   - Provide support for observability via OpenTelemetry.
 
 - Documentation & API Design

@@ -7,25 +7,42 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/GoBetterAuth/go-better-auth/domain/session"
-	"github.com/GoBetterAuth/go-better-auth/repository/memory"
+	"github.com/GoBetterAuth/go-better-auth/domain/user"
 	"github.com/GoBetterAuth/go-better-auth/storage"
+	gobetterauthtests "github.com/GoBetterAuth/go-better-auth/tests"
 )
 
+func setupTestSessionRepository(t *testing.T) (session.Repository, user.Repository) {
+	t.Helper()
+
+	testRepos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	t.Cleanup(cleanup)
+
+	return testRepos.SessionRepo, testRepos.UserRepo
+}
+
 func TestCachedSessionRepository_Create(t *testing.T) {
-	primary := memory.NewSessionRepository()
+	primary, userRepo := setupTestSessionRepository(t)
 	secondary := storage.NewInMemorySecondaryStorage()
 	repo := NewSessionRepository(primary, secondary)
 
+	// Create a user first to satisfy foreign key constraint
+	testUser := gobetterauthtests.CreateTestUser()
+	err := userRepo.Create(testUser)
+	if err != nil {
+		t.Fatalf("failed to create test user: %v", err)
+	}
+
 	sess := &session.Session{
 		ID:        uuid.New().String(),
-		UserID:    "user123",
+		UserID:    testUser.ID,
 		Token:     "token123",
 		ExpiresAt: time.Now().Add(1 * time.Hour),
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
 
-	err := repo.Create(sess)
+	err = repo.Create(sess)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -41,13 +58,20 @@ func TestCachedSessionRepository_Create(t *testing.T) {
 }
 
 func TestCachedSessionRepository_FindByToken_CacheHit(t *testing.T) {
-	primary := memory.NewSessionRepository()
+	primary, userRepo := setupTestSessionRepository(t)
 	secondary := storage.NewInMemorySecondaryStorage()
 	repo := NewSessionRepository(primary, secondary)
 
+	// Create a user first to satisfy foreign key constraint
+	testUser := gobetterauthtests.CreateTestUser()
+	err := userRepo.Create(testUser)
+	if err != nil {
+		t.Fatalf("failed to create test user: %v", err)
+	}
+
 	sess := &session.Session{
 		ID:        uuid.New().String(),
-		UserID:    "user123",
+		UserID:    testUser.ID,
 		Token:     "token123",
 		ExpiresAt: time.Now().Add(1 * time.Hour),
 		CreatedAt: time.Now(),
@@ -84,13 +108,20 @@ func TestCachedSessionRepository_FindByToken_CacheHit(t *testing.T) {
 }
 
 func TestCachedSessionRepository_Delete(t *testing.T) {
-	primary := memory.NewSessionRepository()
+	primary, userRepo := setupTestSessionRepository(t)
 	secondary := storage.NewInMemorySecondaryStorage()
 	repo := NewSessionRepository(primary, secondary)
 
+	// Create a user first to satisfy foreign key constraint
+	testUser := gobetterauthtests.CreateTestUser()
+	err := userRepo.Create(testUser)
+	if err != nil {
+		t.Fatalf("failed to create test user: %v", err)
+	}
+
 	sess := &session.Session{
 		ID:        uuid.New().String(),
-		UserID:    "user123",
+		UserID:    testUser.ID,
 		Token:     "token123",
 		ExpiresAt: time.Now().Add(1 * time.Hour),
 		CreatedAt: time.Now(),
@@ -103,7 +134,7 @@ func TestCachedSessionRepository_Delete(t *testing.T) {
 	}
 
 	// Verify it's cached
-	_, err := repo.FindByToken(sess.Token)
+	_, err = repo.FindByToken(sess.Token)
 	if err != nil {
 		t.Fatalf("expected to find session, got error: %v", err)
 	}
@@ -121,13 +152,20 @@ func TestCachedSessionRepository_Delete(t *testing.T) {
 }
 
 func TestCachedSessionRepository_Update(t *testing.T) {
-	primary := memory.NewSessionRepository()
+	primary, userRepo := setupTestSessionRepository(t)
 	secondary := storage.NewInMemorySecondaryStorage()
 	repo := NewSessionRepository(primary, secondary)
 
+	// Create a user first to satisfy foreign key constraint
+	testUser := gobetterauthtests.CreateTestUser()
+	err := userRepo.Create(testUser)
+	if err != nil {
+		t.Fatalf("failed to create test user: %v", err)
+	}
+
 	sess := &session.Session{
 		ID:        uuid.New().String(),
-		UserID:    "user123",
+		UserID:    testUser.ID,
 		Token:     "token123",
 		ExpiresAt: time.Now().Add(1 * time.Hour),
 		CreatedAt: time.Now(),
