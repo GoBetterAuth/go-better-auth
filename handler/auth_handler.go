@@ -4,18 +4,22 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/GoBetterAuth/go-better-auth/domain/session"
+	"github.com/GoBetterAuth/go-better-auth/domain/user"
 	"github.com/GoBetterAuth/go-better-auth/usecase/auth"
 )
 
 // AuthHandler implements http.Handler for all auth endpoints
 type AuthHandler struct {
-	service *auth.Service
+	service       *auth.Service
+	cookieManager *CookieManager
 }
 
 // NewAuthHandler creates a new auth handler
-func NewAuthHandler(service *auth.Service) http.Handler {
+func NewAuthHandler(service *auth.Service, cookieManager *CookieManager) http.Handler {
 	return &AuthHandler{
-		service: service,
+		service:       service,
+		cookieManager: cookieManager,
 	}
 }
 
@@ -35,38 +39,68 @@ func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		switch endpoint {
 		case "validate":
-			ValidateSessionHandler(h.service)(w, r)
+			h.ValidateSessionHandler(w, r)
 		case "me":
-			GetMeHandler(h.service)(w, r)
+			h.GetMeHandler(w, r)
 		case "verify-email":
-			VerifyEmailHandler(h.service)(w, r)
+			h.VerifyEmailHandler(w, r)
 		default:
 			http.NotFound(w, r)
 		}
 	case "POST":
 		switch endpoint {
 		case "sign-up/email":
-			SignUpHandler(h.service)(w, r)
+			h.SignUpHandler(w, r)
 		case "sign-in/email":
-			SignInHandler(h.service)(w, r)
+			h.SignInHandler(w, r)
 		case "sign-out":
-			SignOutHandler(h.service)(w, r)
+			h.SignOutHandler(w, r)
 		case "validate":
-			ValidateSessionHandler(h.service)(w, r)
+			h.ValidateSessionHandler(w, r)
 		case "refresh":
-			RefreshTokenHandler(h.service)(w, r)
+			h.RefreshTokenHandler(w, r)
 		case "email-verification":
-			SendEmailVerificationHandler(h.service)(w, r)
+			h.SendEmailVerificationHandler(w, r)
 		case "password-reset":
-			SendPasswordResetHandler(h.service)(w, r)
+			h.SendPasswordResetHandler(w, r)
 		case "reset-password":
-			ResetPasswordHandler(h.service)(w, r)
+			h.ResetPasswordHandler(w, r)
 		case "change-email":
-			ChangeEmailHandler(h.service)(w, r)
+			h.ChangeEmailHandler(w, r)
 		default:
 			http.NotFound(w, r)
 		}
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+// checkExistingSession checks if the user has a valid session from cookies
+// Returns the session and user if valid, nil otherwise
+func (h *AuthHandler) checkExistingSession(r *http.Request) (*session.Session, *user.User, error) {
+	cookie, err := r.Cookie(h.cookieManager.GetSessionCookieName())
+	if err != nil {
+		// No cookie found, not an error
+		return nil, nil, nil
+	}
+
+	validateResp, err := h.service.ValidateSession(&auth.ValidateSessionRequest{
+		SessionToken: cookie.Value,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if !validateResp.Valid || validateResp.Session == nil {
+		return nil, nil, nil
+	}
+
+	userResp, err := h.service.GetMe(&auth.GetMeRequest{
+		UserID: validateResp.Session.UserID,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return validateResp.Session, userResp.User, nil
 }

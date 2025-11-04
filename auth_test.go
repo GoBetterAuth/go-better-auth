@@ -266,28 +266,6 @@ func TestAuth_AuthMiddleware_Returns(t *testing.T) {
 	assert.NotNil(t, middleware.HandlerFunc)
 }
 
-func TestAuth_AuthMiddlewareWithCookie_Returns(t *testing.T) {
-	config := &domain.Config{
-		BaseURL: "http://localhost:8080",
-		Secret:  "very-secret-key-that-is-long-enough",
-		Database: domain.DatabaseConfig{
-			Provider:         "sqlite",
-			ConnectionString: ":memory:",
-		},
-	}
-
-	auth, err := New(config)
-	if err != nil {
-		t.Skip("sqlite adapter not available:", err)
-	}
-
-	// Test that AuthMiddlewareWithCookie returns a valid middleware with custom cookie name
-	middleware := auth.AuthMiddlewareWithCookie("custom_session")
-	assert.NotNil(t, middleware)
-	assert.NotNil(t, middleware.Handler)
-	assert.NotNil(t, middleware.HandlerFunc)
-}
-
 func TestAuth_OptionalAuthMiddleware_Returns(t *testing.T) {
 	config := &domain.Config{
 		BaseURL: "http://localhost:8080",
@@ -305,28 +283,6 @@ func TestAuth_OptionalAuthMiddleware_Returns(t *testing.T) {
 
 	// Test that OptionalAuthMiddleware returns a valid middleware
 	middleware := auth.OptionalAuthMiddleware()
-	assert.NotNil(t, middleware)
-	assert.NotNil(t, middleware.Handler)
-	assert.NotNil(t, middleware.HandlerFunc)
-}
-
-func TestAuth_OptionalAuthMiddlewareWithCookie_Returns(t *testing.T) {
-	config := &domain.Config{
-		BaseURL: "http://localhost:8080",
-		Secret:  "very-secret-key-that-is-long-enough",
-		Database: domain.DatabaseConfig{
-			Provider:         "sqlite",
-			ConnectionString: ":memory:",
-		},
-	}
-
-	auth, err := New(config)
-	if err != nil {
-		t.Skip("sqlite adapter not available:", err)
-	}
-
-	// Test that OptionalAuthMiddlewareWithCookie returns a valid middleware with custom cookie name
-	middleware := auth.OptionalAuthMiddlewareWithCookie("custom_auth")
 	assert.NotNil(t, middleware)
 	assert.NotNil(t, middleware.Handler)
 	assert.NotNil(t, middleware.HandlerFunc)

@@ -9,7 +9,6 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/usecase/auth"
 )
 
-// SignUpRequest is the HTTP request for user signup
 type SignUpRequest struct {
 	Email       string `json:"email"`
 	Password    string `json:"password"`
@@ -17,49 +16,57 @@ type SignUpRequest struct {
 	CallbackURL string `json:"callback_url,omitempty"`
 }
 
-// SignUpResponse is the HTTP response for user signup
 type SignUpResponse struct {
 	Token string     `json:"token"`
 	User  *user.User `json:"user"`
 }
 
 // SignUpHandler handles POST /auth/signup
-func SignUpHandler(service *auth.Service) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			ErrorResponse(w, http.StatusMethodNotAllowed, "method not allowed")
-			return
-		}
-
-		var req SignUpRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			ErrorResponse(w, http.StatusBadRequest, "invalid request body")
-			return
-		}
-
-		resp, err := service.SignUp(r.Context(), &auth.SignUpRequest{
-			Email:       req.Email,
-			Password:    req.Password,
-			Name:        req.Name,
-			CallbackURL: req.CallbackURL,
-		})
-		if err != nil {
-			errMsg := err.Error()
-			if errMsg == "sign up is disabled" {
-				ErrorResponse(w, http.StatusForbidden, "sign up is disabled")
-			} else if errMsg == "user with this email already exists" {
-				ErrorResponse(w, http.StatusConflict, "email already registered")
-			} else if strings.HasPrefix(errMsg, "invalid request:") {
-				ErrorResponse(w, http.StatusBadRequest, errMsg)
-			} else {
-				ErrorResponse(w, http.StatusBadRequest, err.Error())
-			}
-			return
-		}
-
-		SuccessResponse(w, http.StatusCreated, &SignUpResponse{
-			Token: resp.Session.Token,
-			User:  resp.User,
-		})
+func (h *AuthHandler) SignUpHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		ErrorResponse(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
 	}
+
+	existingSession, existingUser, err := h.checkExistingSession(r)
+	if err == nil && existingSession != nil && existingUser != nil {
+		SuccessResponse(w, http.StatusOK, &SignUpResponse{
+			Token: existingSession.Token,
+			User:  existingUser,
+		})
+		return
+	}
+
+	var req SignUpRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		ErrorResponse(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	resp, err := h.service.SignUp(r.Context(), &auth.SignUpRequest{
+		Email:       req.Email,
+		Password:    req.Password,
+		Name:        req.Name,
+		CallbackURL: req.CallbackURL,
+	})
+	if err != nil {
+		errMsg := err.Error()
+		if errMsg == "sign up is disabled" {
+			ErrorResponse(w, http.StatusForbidden, "sign up is disabled")
+		} else if errMsg == "user with this email already exists" {
+			ErrorResponse(w, http.StatusConflict, "email already registered")
+		} else if strings.HasPrefix(errMsg, "invalid request:") {
+			ErrorResponse(w, http.StatusBadRequest, errMsg)
+		} else {
+			ErrorResponse(w, http.StatusBadRequest, err.Error())
+		}
+		return
+	}
+
+	h.cookieManager.SetSessionCookie(w, resp.Session.Token, resp.Session.ExpiresAt)
+
+	SuccessResponse(w, http.StatusCreated, &SignUpResponse{
+		Token: resp.Session.Token,
+		User:  resp.User,
+	})
 }

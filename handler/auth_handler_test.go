@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,7 +20,7 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/usecase/auth"
 )
 
-func setupTestService(t *testing.T) *auth.Service {
+func setupTestHandler(t *testing.T) *AuthHandler {
 	t.Helper()
 
 	config := gobetterauthtests.CreateTestConfig()
@@ -27,18 +28,23 @@ func setupTestService(t *testing.T) *auth.Service {
 	testRepos, cleanup := gobetterauthtests.SetupTestRepositories(t)
 	t.Cleanup(cleanup)
 
-	return auth.NewService(
+	authService := auth.NewService(
 		config,
 		testRepos.UserRepo,
 		testRepos.SessionRepo,
 		testRepos.AccountRepo,
 		testRepos.VerificationRepo,
 	)
+	cookieManager := NewCookieManager(config)
+
+	return &AuthHandler{
+		service:       authService,
+		cookieManager: cookieManager,
+	}
 }
 
 func TestSignUpHandler_Valid(t *testing.T) {
-	service := setupTestService(t)
-	handler := SignUpHandler(service)
+	handler := setupTestHandler(t)
 
 	req := SignUpRequest{
 		Email:    "test@example.com",
@@ -50,7 +56,7 @@ func TestSignUpHandler_Valid(t *testing.T) {
 	httpReq := httptest.NewRequest(http.MethodPost, "/auth/signup", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 
-	handler(w, httpReq)
+	handler.SignUpHandler(w, httpReq)
 
 	if w.Code != http.StatusCreated {
 		t.Errorf("Expected status %d, got %d", http.StatusCreated, w.Code)
@@ -63,7 +69,7 @@ func TestSignUpHandler_Valid(t *testing.T) {
 		t.Error("Expected success response")
 	}
 
-	data := resp.Data.(map[string]any)
+	data := resp.Data.(map[string]interface{})
 	if data["token"] == nil {
 		t.Error("Expected token in response")
 	}
@@ -75,13 +81,12 @@ func TestSignUpHandler_Valid(t *testing.T) {
 }
 
 func TestSignUpHandler_InvalidMethod(t *testing.T) {
-	svc := setupTestService(t)
-	handler := SignUpHandler(svc)
+	handler := setupTestHandler(t)
 
 	httpReq := httptest.NewRequest(http.MethodGet, "/auth/signup", nil)
 	w := httptest.NewRecorder()
 
-	handler(w, httpReq)
+	handler.SignUpHandler(w, httpReq)
 
 	if w.Code != http.StatusMethodNotAllowed {
 		t.Errorf("Expected status %d, got %d", http.StatusMethodNotAllowed, w.Code)
@@ -89,13 +94,12 @@ func TestSignUpHandler_InvalidMethod(t *testing.T) {
 }
 
 func TestSignUpHandler_InvalidBody(t *testing.T) {
-	svc := setupTestService(t)
-	handler := SignUpHandler(svc)
+	handler := setupTestHandler(t)
 
 	httpReq := httptest.NewRequest(http.MethodPost, "/auth/signup", bytes.NewReader([]byte("invalid json")))
 	w := httptest.NewRecorder()
 
-	handler(w, httpReq)
+	handler.SignUpHandler(w, httpReq)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected status %d, got %d", http.StatusBadRequest, w.Code)
@@ -103,7 +107,7 @@ func TestSignUpHandler_InvalidBody(t *testing.T) {
 }
 
 func TestSignUpHandler_DuplicateEmail(t *testing.T) {
-	svc := setupTestService(t)
+	handler := setupTestHandler(t)
 
 	// Create first user
 	req1 := SignUpRequest{
@@ -114,7 +118,7 @@ func TestSignUpHandler_DuplicateEmail(t *testing.T) {
 	body1, _ := json.Marshal(req1)
 	httpReq1 := httptest.NewRequest(http.MethodPost, "/auth/signup", bytes.NewReader(body1))
 	w1 := httptest.NewRecorder()
-	SignUpHandler(svc)(w1, httpReq1)
+	handler.SignUpHandler(w1, httpReq1)
 
 	// Try to create second user with same email
 	req2 := SignUpRequest{
@@ -125,7 +129,7 @@ func TestSignUpHandler_DuplicateEmail(t *testing.T) {
 	body2, _ := json.Marshal(req2)
 	httpReq2 := httptest.NewRequest(http.MethodPost, "/auth/signup", bytes.NewReader(body2))
 	w2 := httptest.NewRecorder()
-	SignUpHandler(svc)(w2, httpReq2)
+	handler.SignUpHandler(w2, httpReq2)
 
 	if w2.Code != http.StatusConflict {
 		t.Errorf("Expected status %d, got %d", http.StatusConflict, w2.Code)
@@ -133,7 +137,7 @@ func TestSignUpHandler_DuplicateEmail(t *testing.T) {
 }
 
 func TestSignInHandler_Valid(t *testing.T) {
-	svc := setupTestService(t)
+	handler := setupTestHandler(t)
 
 	// Sign up first
 	signupReq := SignUpRequest{
@@ -144,7 +148,7 @@ func TestSignInHandler_Valid(t *testing.T) {
 	body, _ := json.Marshal(signupReq)
 	httpReq := httptest.NewRequest(http.MethodPost, "/auth/signup", bytes.NewReader(body))
 	w := httptest.NewRecorder()
-	SignUpHandler(svc)(w, httpReq)
+	handler.SignUpHandler(w, httpReq)
 
 	// Now sign in
 	signinReq := SignInRequest{
@@ -155,7 +159,7 @@ func TestSignInHandler_Valid(t *testing.T) {
 	signinHttpReq := httptest.NewRequest(http.MethodPost, "/auth/signin", bytes.NewReader(signinBody))
 	signinW := httptest.NewRecorder()
 
-	SignInHandler(svc)(signinW, signinHttpReq)
+	handler.SignInHandler(signinW, signinHttpReq)
 
 	if signinW.Code != http.StatusOK {
 		t.Errorf("Expected status %d, got %d", http.StatusOK, signinW.Code)
@@ -170,7 +174,7 @@ func TestSignInHandler_Valid(t *testing.T) {
 }
 
 func TestSignInHandler_InvalidPassword(t *testing.T) {
-	svc := setupTestService(t)
+	handler := setupTestHandler(t)
 
 	// Sign up first
 	signupReq := SignUpRequest{
@@ -181,7 +185,7 @@ func TestSignInHandler_InvalidPassword(t *testing.T) {
 	body, _ := json.Marshal(signupReq)
 	httpReq := httptest.NewRequest(http.MethodPost, "/auth/signup", bytes.NewReader(body))
 	w := httptest.NewRecorder()
-	SignUpHandler(svc)(w, httpReq)
+	handler.SignUpHandler(w, httpReq)
 
 	// Try to sign in with wrong password
 	signinReq := SignInRequest{
@@ -192,7 +196,7 @@ func TestSignInHandler_InvalidPassword(t *testing.T) {
 	signinHttpReq := httptest.NewRequest(http.MethodPost, "/auth/signin", bytes.NewReader(signinBody))
 	signinW := httptest.NewRecorder()
 
-	SignInHandler(svc)(signinW, signinHttpReq)
+	handler.SignInHandler(signinW, signinHttpReq)
 
 	if signinW.Code != http.StatusUnauthorized {
 		t.Errorf("Expected status %d, got %d", http.StatusUnauthorized, signinW.Code)
@@ -200,7 +204,7 @@ func TestSignInHandler_InvalidPassword(t *testing.T) {
 }
 
 func TestSignOutHandler_Valid(t *testing.T) {
-	svc := setupTestService(t)
+	handler := setupTestHandler(t)
 
 	// Sign up and sign in
 	signupReq := SignUpRequest{
@@ -211,7 +215,7 @@ func TestSignOutHandler_Valid(t *testing.T) {
 	body, _ := json.Marshal(signupReq)
 	httpReq := httptest.NewRequest(http.MethodPost, "/auth/signup", bytes.NewReader(body))
 	w := httptest.NewRecorder()
-	SignUpHandler(svc)(w, httpReq)
+	handler.SignUpHandler(w, httpReq)
 
 	signinReq := SignInRequest{
 		Email:    "test@example.com",
@@ -221,7 +225,7 @@ func TestSignOutHandler_Valid(t *testing.T) {
 	signinHttpReq := httptest.NewRequest(http.MethodPost, "/auth/signin", bytes.NewReader(signinBody))
 	signinW := httptest.NewRecorder()
 
-	SignInHandler(svc)(signinW, signinHttpReq)
+	handler.SignInHandler(signinW, signinHttpReq)
 
 	var signinResp Response
 	json.NewDecoder(signinW.Body).Decode(&signinResp)
@@ -236,7 +240,7 @@ func TestSignOutHandler_Valid(t *testing.T) {
 	signoutHttpReq := httptest.NewRequest(http.MethodPost, "/auth/signout", bytes.NewReader(signoutBody))
 	signoutW := httptest.NewRecorder()
 
-	SignOutHandler(svc)(signoutW, signoutHttpReq)
+	handler.SignOutHandler(signoutW, signoutHttpReq)
 
 	if signoutW.Code != http.StatusOK {
 		t.Errorf("Expected status %d, got %d", http.StatusOK, signoutW.Code)
@@ -244,7 +248,7 @@ func TestSignOutHandler_Valid(t *testing.T) {
 }
 
 func TestValidateSessionHandler_Valid(t *testing.T) {
-	svc := setupTestService(t)
+	handler := setupTestHandler(t)
 
 	// Sign up and sign in to get token
 	signupReq := SignUpRequest{
@@ -255,7 +259,7 @@ func TestValidateSessionHandler_Valid(t *testing.T) {
 	body, _ := json.Marshal(signupReq)
 	httpReq := httptest.NewRequest(http.MethodPost, "/auth/signup", bytes.NewReader(body))
 	w := httptest.NewRecorder()
-	SignUpHandler(svc)(w, httpReq)
+	handler.SignUpHandler(w, httpReq)
 
 	signinReq := SignInRequest{
 		Email:    "test@example.com",
@@ -265,7 +269,7 @@ func TestValidateSessionHandler_Valid(t *testing.T) {
 	signinHttpReq := httptest.NewRequest(http.MethodPost, "/auth/signin", bytes.NewReader(signinBody))
 	signinW := httptest.NewRecorder()
 
-	SignInHandler(svc)(signinW, signinHttpReq)
+	handler.SignInHandler(signinW, signinHttpReq)
 
 	var signinResp Response
 	json.NewDecoder(signinW.Body).Decode(&signinResp)
@@ -273,15 +277,11 @@ func TestValidateSessionHandler_Valid(t *testing.T) {
 	token := signinData["token"].(string)
 
 	// Validate session
-	validateReq := ValidateSessionRequest{
-		Token: token,
-	}
-	validateBody, _ := json.Marshal(validateReq)
-	validateHttpReq := httptest.NewRequest(http.MethodPost, "/auth/validate", bytes.NewReader(validateBody))
+	validateHttpReq := httptest.NewRequest(http.MethodGet, "/auth/validate", nil)
 	validateHttpReq.Header.Set("Authorization", "Bearer "+token)
 	validateW := httptest.NewRecorder()
 
-	ValidateSessionHandler(svc)(validateW, validateHttpReq)
+	handler.ValidateSessionHandler(validateW, validateHttpReq)
 
 	if validateW.Code != http.StatusOK {
 		t.Errorf("Expected status %d, got %d", http.StatusOK, validateW.Code)
@@ -296,13 +296,13 @@ func TestValidateSessionHandler_Valid(t *testing.T) {
 }
 
 func TestValidateSessionHandler_InvalidToken(t *testing.T) {
-	svc := setupTestService(t)
+	handler := setupTestHandler(t)
 
-	validateHttpReq := httptest.NewRequest(http.MethodPost, "/auth/validate", nil)
+	validateHttpReq := httptest.NewRequest(http.MethodGet, "/auth/validate", nil)
 	validateHttpReq.Header.Set("Authorization", "Bearer invalid-token")
 	validateW := httptest.NewRecorder()
 
-	ValidateSessionHandler(svc)(validateW, validateHttpReq)
+	handler.ValidateSessionHandler(validateW, validateHttpReq)
 
 	if validateW.Code != http.StatusUnauthorized {
 		t.Errorf("Expected status %d, got %d", http.StatusUnauthorized, validateW.Code)
@@ -370,6 +370,10 @@ func TestVerifyEmailGetHandler_ValidToken(t *testing.T) {
 	err = repos.VerificationRepo.Create(v)
 	require.NoError(t, err)
 
+	// Make request
+	httpReq := httptest.NewRequest(http.MethodGet, "/auth/verify-email?token="+verificationToken, nil)
+	w := httptest.NewRecorder()
+
 	// Create service with configuration for this test
 	config := &domain.Config{}
 	config.ApplyDefaults()
@@ -382,14 +386,13 @@ func TestVerifyEmailGetHandler_ValidToken(t *testing.T) {
 		repos.AccountRepo,
 		repos.VerificationRepo,
 	)
+	cookieManager := NewCookieManager(config)
+	handler := &AuthHandler{
+		service:       service,
+		cookieManager: cookieManager,
+	}
 
-	handler := VerifyEmailHandler(service)
-
-	// Make request
-	httpReq := httptest.NewRequest(http.MethodGet, "/auth/verify-email?token="+verificationToken, nil)
-	w := httptest.NewRecorder()
-
-	handler(w, httpReq)
+	handler.VerifyEmailHandler(w, httpReq)
 
 	// Verify redirect
 	if w.Code != http.StatusOK {
@@ -410,13 +413,12 @@ func TestVerifyEmailGetHandler_ValidToken(t *testing.T) {
 }
 
 func TestVerifyEmailGetHandler_MissingToken(t *testing.T) {
-	service := setupTestService(t)
-	handler := VerifyEmailHandler(service)
+	handler := setupTestHandler(t)
 
 	httpReq := httptest.NewRequest(http.MethodGet, "/auth/verify-email", nil)
 	w := httptest.NewRecorder()
 
-	handler(w, httpReq)
+	handler.VerifyEmailHandler(w, httpReq)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected status %d, got %d", http.StatusBadRequest, w.Code)
@@ -424,13 +426,12 @@ func TestVerifyEmailGetHandler_MissingToken(t *testing.T) {
 }
 
 func TestVerifyEmailGetHandler_InvalidToken(t *testing.T) {
-	service := setupTestService(t)
-	handler := VerifyEmailHandler(service)
+	handler := setupTestHandler(t)
 
 	httpReq := httptest.NewRequest(http.MethodGet, "/auth/verify-email?token=invalid-token", nil)
 	w := httptest.NewRecorder()
 
-	handler(w, httpReq)
+	handler.VerifyEmailHandler(w, httpReq)
 
 	// Invalid token should return 401 Unauthorized
 	if w.Code != http.StatusUnauthorized && w.Code != http.StatusInternalServerError {
@@ -465,6 +466,9 @@ func TestVerifyEmailGetHandler_ExpiredToken(t *testing.T) {
 	err = repos.VerificationRepo.Create(v)
 	require.NoError(t, err)
 
+	httpReq := httptest.NewRequest(http.MethodGet, "/auth/verify-email?token="+verificationToken, nil)
+	w := httptest.NewRecorder()
+
 	config := &domain.Config{}
 	config.ApplyDefaults()
 
@@ -475,13 +479,13 @@ func TestVerifyEmailGetHandler_ExpiredToken(t *testing.T) {
 		repos.AccountRepo,
 		repos.VerificationRepo,
 	)
+	cookieManager := NewCookieManager(config)
+	handler := &AuthHandler{
+		service:       service,
+		cookieManager: cookieManager,
+	}
 
-	handler := VerifyEmailHandler(service)
-
-	httpReq := httptest.NewRequest(http.MethodGet, "/auth/verify-email?token="+verificationToken, nil)
-	w := httptest.NewRecorder()
-
-	handler(w, httpReq)
+	handler.VerifyEmailHandler(w, httpReq)
 
 	if w.Code != http.StatusUnauthorized {
 		t.Errorf("Expected status %d, got %d", http.StatusUnauthorized, w.Code)
@@ -489,14 +493,13 @@ func TestVerifyEmailGetHandler_ExpiredToken(t *testing.T) {
 }
 
 func TestVerifyEmailGetHandler_InvalidMethod(t *testing.T) {
-	service := setupTestService(t)
-	handler := VerifyEmailHandler(service)
+	handler := setupTestHandler(t)
 
 	// Test with invalid method (PUT)
 	httpReq := httptest.NewRequest(http.MethodPut, "/auth/verify-email", nil)
 	w := httptest.NewRecorder()
 
-	handler(w, httpReq)
+	handler.VerifyEmailHandler(w, httpReq)
 
 	if w.Code != http.StatusMethodNotAllowed {
 		t.Errorf("Expected status %d, got %d", http.StatusMethodNotAllowed, w.Code)
@@ -530,6 +533,9 @@ func TestVerifyEmailGetHandler_CustomRedirectURL(t *testing.T) {
 	err = repos.VerificationRepo.Create(v)
 	require.NoError(t, err)
 
+	httpReq := httptest.NewRequest(http.MethodGet, "/auth/verify-email?token="+verificationToken+"&callbackURL=https://example.com/login?verified=true", nil)
+	w := httptest.NewRecorder()
+
 	config := &domain.Config{}
 	config.ApplyDefaults()
 	config.BaseURL = "https://example.com"
@@ -537,7 +543,6 @@ func TestVerifyEmailGetHandler_CustomRedirectURL(t *testing.T) {
 		ExpiresIn:             24 * time.Hour,
 		SendVerificationEmail: nil,
 	}
-
 	service := auth.NewService(
 		config,
 		repos.UserRepo,
@@ -545,13 +550,13 @@ func TestVerifyEmailGetHandler_CustomRedirectURL(t *testing.T) {
 		repos.AccountRepo,
 		repos.VerificationRepo,
 	)
+	cookieManager := NewCookieManager(config)
+	handler := &AuthHandler{
+		service:       service,
+		cookieManager: cookieManager,
+	}
 
-	handler := VerifyEmailHandler(service)
-
-	httpReq := httptest.NewRequest(http.MethodGet, "/auth/verify-email?token="+verificationToken+"&callbackURL=https://example.com/login?verified=true", nil)
-	w := httptest.NewRecorder()
-
-	handler(w, httpReq)
+	handler.VerifyEmailHandler(w, httpReq)
 
 	if w.Code != http.StatusSeeOther {
 		t.Errorf("Expected status %d, got %d", http.StatusSeeOther, w.Code)
@@ -577,4 +582,169 @@ func TestVerifyEmailGetHandler_CustomRedirectURL(t *testing.T) {
 	if query.Get("type") != string(verification.TypeEmailVerification) {
 		t.Fatalf("Expected type query param to be appended, got %s", query.Get("type"))
 	}
+}
+
+func TestSignInHandler_ReuseExistingSession(t *testing.T) {
+	handler := setupTestHandler(t)
+
+	// First, create a user and sign them in to get a session
+	signUpReq := SignUpRequest{
+		Email:    "reuse@example.com",
+		Password: "ValidPassword123!",
+		Name:     "Reuse Test User",
+	}
+
+	signUpBody, _ := json.Marshal(signUpReq)
+	req := httptest.NewRequest(http.MethodPost, "/auth/sign-up/email", bytes.NewReader(signUpBody))
+	w := httptest.NewRecorder()
+
+	handler.SignUpHandler(w, req)
+	require.Equal(t, http.StatusCreated, w.Code)
+
+	bodyStr := w.Body.String()
+	t.Logf("Response body: %s", bodyStr)
+
+	// Need to re-create the reader since we read it above
+	var envelope Response
+	err := json.NewDecoder(strings.NewReader(bodyStr)).Decode(&envelope)
+	require.NoError(t, err)
+	require.True(t, envelope.Success)
+
+	// Now decode the data part as SignUpResponse
+	dataBytes, err := json.Marshal(envelope.Data)
+	require.NoError(t, err)
+
+	var signUpResponse SignUpResponse
+	err = json.Unmarshal(dataBytes, &signUpResponse)
+	require.NoError(t, err)
+
+	originalToken := signUpResponse.Token
+
+	// Extract the session cookie set by the signup
+	cookies := w.Result().Cookies()
+	expectedCookieName := handler.cookieManager.GetSessionCookieName()
+
+	var sessionCookie *http.Cookie
+	for _, cookie := range cookies {
+		if cookie.Name == expectedCookieName {
+			sessionCookie = cookie
+			break
+		}
+	}
+
+	require.NotNil(t, sessionCookie, "Session cookie should be set")
+	require.Equal(t, originalToken, sessionCookie.Value)
+
+	// Now try to sign in with the same user, but include the existing session cookie
+	signInReq := SignInRequest{
+		Email:    "reuse@example.com",
+		Password: "ValidPassword123!",
+	}
+
+	signInBody, _ := json.Marshal(signInReq)
+	req2 := httptest.NewRequest(http.MethodPost, "/auth/sign-in/email", bytes.NewReader(signInBody))
+	req2.AddCookie(sessionCookie) // Add the existing session cookie
+	w2 := httptest.NewRecorder()
+
+	handler.SignInHandler(w2, req2)
+	require.Equal(t, http.StatusOK, w2.Code)
+
+	signInBodyStr := w2.Body.String()
+
+	var signInEnvelope Response
+	err = json.NewDecoder(strings.NewReader(signInBodyStr)).Decode(&signInEnvelope)
+	require.NoError(t, err)
+	require.True(t, signInEnvelope.Success)
+
+	signInDataBytes, err := json.Marshal(signInEnvelope.Data)
+	require.NoError(t, err)
+
+	var signInResponse SignInResponse
+	err = json.Unmarshal(signInDataBytes, &signInResponse)
+	require.NoError(t, err)
+
+	// Verify that the same token is returned (session was reused)
+	require.Equal(t, originalToken, signInResponse.Token)
+	require.Equal(t, signUpResponse.User.ID, signInResponse.User.ID)
+	require.Equal(t, signUpResponse.User.Email, signInResponse.User.Email)
+}
+
+func TestSignUpHandler_ReuseExistingSession(t *testing.T) {
+	handler := setupTestHandler(t)
+
+	// First, create a user and sign them in to get a session
+	signUpReq := SignUpRequest{
+		Email:    "reusesignup@example.com",
+		Password: "ValidPassword123!",
+		Name:     "Reuse Signup Test User",
+	}
+
+	signUpBody, _ := json.Marshal(signUpReq)
+	req := httptest.NewRequest(http.MethodPost, "/auth/sign-up/email", bytes.NewReader(signUpBody))
+	w := httptest.NewRecorder()
+
+	handler.SignUpHandler(w, req)
+	require.Equal(t, http.StatusCreated, w.Code)
+
+	bodyStr := w.Body.String()
+
+	var envelope Response
+	err := json.NewDecoder(strings.NewReader(bodyStr)).Decode(&envelope)
+	require.NoError(t, err)
+	require.True(t, envelope.Success)
+
+	dataBytes, err := json.Marshal(envelope.Data)
+	require.NoError(t, err)
+
+	var signUpResponse SignUpResponse
+	err = json.Unmarshal(dataBytes, &signUpResponse)
+	require.NoError(t, err)
+
+	originalToken := signUpResponse.Token
+
+	// Extract the session cookie set by the signup
+	cookies := w.Result().Cookies()
+	var sessionCookie *http.Cookie
+	for _, cookie := range cookies {
+		if cookie.Name == handler.cookieManager.GetSessionCookieName() {
+			sessionCookie = cookie
+			break
+		}
+	}
+	require.NotNil(t, sessionCookie, "Session cookie should be set")
+
+	// Try to sign up again with different details but include the existing session cookie
+	// This should return the existing session instead of creating a new user
+	signUp2Req := SignUpRequest{
+		Email:    "different@example.com",
+		Password: "DifferentPassword123!",
+		Name:     "Different User",
+	}
+
+	signUp2Body, _ := json.Marshal(signUp2Req)
+	req2 := httptest.NewRequest(http.MethodPost, "/auth/sign-up/email", bytes.NewReader(signUp2Body))
+	req2.AddCookie(sessionCookie) // Add the existing session cookie
+	w2 := httptest.NewRecorder()
+
+	handler.SignUpHandler(w2, req2)
+	require.Equal(t, http.StatusOK, w2.Code) // Should be 200 (existing session) not 201 (created)
+
+	signUp2BodyStr := w2.Body.String()
+
+	var signUp2Envelope Response
+	err = json.NewDecoder(strings.NewReader(signUp2BodyStr)).Decode(&signUp2Envelope)
+	require.NoError(t, err)
+	require.True(t, signUp2Envelope.Success)
+
+	signUp2DataBytes, err := json.Marshal(signUp2Envelope.Data)
+	require.NoError(t, err)
+
+	var signUp2Response SignUpResponse
+	err = json.Unmarshal(signUp2DataBytes, &signUp2Response)
+	require.NoError(t, err)
+
+	// Verify that the same session is returned (not a new user)
+	require.Equal(t, originalToken, signUp2Response.Token)
+	require.Equal(t, signUpResponse.User.ID, signUp2Response.User.ID)
+	require.Equal(t, signUpResponse.User.Email, signUp2Response.User.Email) // Should be original email, not the new one
 }

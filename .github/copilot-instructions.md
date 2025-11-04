@@ -18,6 +18,15 @@
   - Third-party imports
   - Internal imports
 
+- Coding guide:
+
+  - Follow Go's official coding style as outlined in Effective Go and Go Code Review Comments.
+  - Use `gofmt` or `goimports` to format code consistently.
+  - Use meaningful variable and function names that convey intent.
+  - Keep functions small and focused on a single responsibility.
+  - Write comments for complex logic, exported functions, and types.
+  - Prefer to use `any` instead of `interface{}` for better readability.
+
 - Project Layout (Go Clean Architecture):
 
   - Organize the codebase into the following main layers:
