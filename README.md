@@ -8,7 +8,8 @@
 
 ---
 
-**Note:** This project is still a work in progress. Contributions are most welcome!
+> [!NOTE]
+> This project is still a work in progress. Contributions are most welcome!
 
 ---
 
