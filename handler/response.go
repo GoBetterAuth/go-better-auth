@@ -9,7 +9,7 @@ import (
 type Response struct {
 	Success bool   `json:"success"`
 	Data    any    `json:"data,omitempty"`
-	Error   string `json:"error,omitempty"`
+	Message string `json:"message,omitempty"`
 }
 
 // ErrorResponse writes a JSON error response
@@ -18,7 +18,7 @@ func ErrorResponse(w http.ResponseWriter, code int, message string) {
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(Response{
 		Success: false,
-		Error:   message,
+		Message: message,
 	})
 }
 

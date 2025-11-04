@@ -320,8 +320,8 @@ func TestResponseEnvelope_Success(t *testing.T) {
 		t.Error("Expected success = true")
 	}
 
-	if resp.Error != "" {
-		t.Errorf("Expected no error, got %s", resp.Error)
+	if resp.Message != "" {
+		t.Errorf("Expected no error, got %s", resp.Message)
 	}
 }
 
@@ -336,8 +336,8 @@ func TestResponseEnvelope_Error(t *testing.T) {
 		t.Error("Expected success = false")
 	}
 
-	if resp.Error != "bad request" {
-		t.Errorf("Expected error 'bad request', got %s", resp.Error)
+	if resp.Message != "bad request" {
+		t.Errorf("Expected error 'bad request', got %s", resp.Message)
 	}
 }
 

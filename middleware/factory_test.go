@@ -179,7 +179,7 @@ func TestAuthMiddlewareFactory_ContextUtilities(t *testing.T) {
 
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		userID, err := GetUserID(r.Context())
-		if err != nil {
+		if err != nil || userID == "" {
 			w.WriteHeader(http.StatusUnauthorized)
 			w.Write([]byte("no user"))
 			return

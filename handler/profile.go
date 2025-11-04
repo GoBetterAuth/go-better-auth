@@ -19,16 +19,22 @@ type GetMeResponse struct {
 }
 
 // GetMeHandler handles GET /auth/me
-// Requires AuthMiddleware to be applied to extract user ID from context
+// If user is authenticated, it returns the user's profile information. Otherwise, it returns null.
 func (h *AuthHandler) GetMeHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodPost {
 		ErrorResponse(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
-	userID, err := middleware.MustGetUserID(r.Context())
+	userID, err := middleware.GetUserID(r.Context())
 	if err != nil {
 		ErrorResponse(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+	if userID == "" {
+		SuccessResponse(w, http.StatusOK, GetMeResponse{
+			User: nil,
+		})
 		return
 	}
 

@@ -61,18 +61,16 @@ func TestGetUserID_Missing(t *testing.T) {
 	ctx := context.Background()
 
 	userID, err := GetUserID(ctx)
-	assert.Error(t, err)
-	assert.Equal(t, "", userID)
-	assert.Equal(t, "user ID not found in context", err.Error())
+	assert.Empty(t, userID)
+	assert.Nil(t, err)
 }
 
 func TestGetUserID_Empty(t *testing.T) {
 	ctx := SetUserID(context.Background(), "")
 
 	userID, err := GetUserID(ctx)
+	assert.Empty(t, userID)
 	assert.Error(t, err)
-	assert.Equal(t, "", userID)
-	assert.Equal(t, "user ID is empty", err.Error())
 }
 
 func TestMustGetUserID_Success(t *testing.T) {
@@ -104,9 +102,8 @@ func TestGetSessionToken_Missing(t *testing.T) {
 	ctx := context.Background()
 
 	token, err := GetSessionToken(ctx)
-	assert.Error(t, err)
-	assert.Equal(t, "", token)
-	assert.Equal(t, "session token not found in context", err.Error())
+	assert.Empty(t, "", token)
+	assert.Nil(t, err)
 }
 
 // ===== AuthMiddleware Tests =====
@@ -403,7 +400,7 @@ func TestOptionalAuthMiddleware_NoToken(t *testing.T) {
 	protectedHandler := middleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Should be able to check if user ID exists without error
 		_, err := GetUserID(r.Context())
-		assert.Error(t, err) // UserID won't be present
+		assert.Nil(t, err) // UserID won't be present
 
 		w.WriteHeader(http.StatusOK)
 	}))
