@@ -8,24 +8,30 @@ import (
 	"testing"
 
 	"github.com/GoBetterAuth/go-better-auth/domain"
-	"github.com/GoBetterAuth/go-better-auth/repository/memory"
+	gobetterauthtests "github.com/GoBetterAuth/go-better-auth/tests"
 	"github.com/GoBetterAuth/go-better-auth/usecase/auth"
 	"github.com/stretchr/testify/assert"
 )
 
-func setupTestService() *auth.Service {
+func setupTestService(t *testing.T) *auth.Service {
+	t.Helper()
+
+	// Use migration-enabled test helpers instead of direct repository creation
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	t.Cleanup(cleanup)
+
 	return auth.NewService(
 		&domain.Config{},
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 }
 
 func TestNewAuthMiddlewareFactory(t *testing.T) {
 	logger := slog.Default()
-	service := setupTestService()
+	service := setupTestService(t)
 
 	factory := NewAuthMiddlewareFactory(service, logger)
 
@@ -36,7 +42,7 @@ func TestNewAuthMiddlewareFactory(t *testing.T) {
 }
 
 func TestNewAuthMiddlewareFactory_NilLogger(t *testing.T) {
-	service := setupTestService()
+	service := setupTestService(t)
 
 	factory := NewAuthMiddlewareFactory(service, nil)
 
@@ -46,7 +52,7 @@ func TestNewAuthMiddlewareFactory_NilLogger(t *testing.T) {
 
 func TestAuthMiddlewareFactory_AuthHandler_Returns(t *testing.T) {
 	logger := slog.Default()
-	service := setupTestService()
+	service := setupTestService(t)
 	factory := NewAuthMiddlewareFactory(service, logger)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -59,7 +65,7 @@ func TestAuthMiddlewareFactory_AuthHandler_Returns(t *testing.T) {
 
 func TestAuthMiddlewareFactory_AuthHandlerFunc_Returns(t *testing.T) {
 	logger := slog.Default()
-	service := setupTestService()
+	service := setupTestService(t)
 	factory := NewAuthMiddlewareFactory(service, logger)
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -72,7 +78,7 @@ func TestAuthMiddlewareFactory_AuthHandlerFunc_Returns(t *testing.T) {
 
 func TestAuthMiddlewareFactory_OptionalAuthHandler_Returns(t *testing.T) {
 	logger := slog.Default()
-	service := setupTestService()
+	service := setupTestService(t)
 	factory := NewAuthMiddlewareFactory(service, logger)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -85,7 +91,7 @@ func TestAuthMiddlewareFactory_OptionalAuthHandler_Returns(t *testing.T) {
 
 func TestAuthMiddlewareFactory_OptionalAuthHandlerFunc_Returns(t *testing.T) {
 	logger := slog.Default()
-	service := setupTestService()
+	service := setupTestService(t)
 	factory := NewAuthMiddlewareFactory(service, logger)
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -98,7 +104,7 @@ func TestAuthMiddlewareFactory_OptionalAuthHandlerFunc_Returns(t *testing.T) {
 
 func TestAuthMiddlewareFactory_WithCookieName(t *testing.T) {
 	logger := slog.Default()
-	service := setupTestService()
+	service := setupTestService(t)
 	factory := NewAuthMiddlewareFactory(service, logger)
 
 	assert.Equal(t, "session_token", factory.cookieName)
@@ -111,7 +117,7 @@ func TestAuthMiddlewareFactory_WithCookieName(t *testing.T) {
 
 func TestAuthMiddlewareFactory_Chaining(t *testing.T) {
 	logger := slog.Default()
-	service := setupTestService()
+	service := setupTestService(t)
 	factory := NewAuthMiddlewareFactory(service, logger)
 
 	result := factory.WithCookieName("auth").WithCookieName("session")
@@ -122,7 +128,7 @@ func TestAuthMiddlewareFactory_Chaining(t *testing.T) {
 
 func TestAuthMiddlewareFactory_MultipleHandlers(t *testing.T) {
 	logger := slog.Default()
-	service := setupTestService()
+	service := setupTestService(t)
 	factory := NewAuthMiddlewareFactory(service, logger)
 
 	handler1 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -154,7 +160,7 @@ func TestAuthMiddlewareFactory_MultipleHandlers(t *testing.T) {
 
 func TestAuthMiddlewareFactory_Integration_WithMux(t *testing.T) {
 	logger := slog.Default()
-	service := setupTestService()
+	service := setupTestService(t)
 	factory := NewAuthMiddlewareFactory(service, logger)
 
 	mux := http.NewServeMux()
@@ -188,7 +194,7 @@ func TestAuthMiddlewareFactory_Integration_WithMux(t *testing.T) {
 
 func TestAuthMiddlewareFactory_ContextUtilities(t *testing.T) {
 	logger := slog.Default()
-	service := setupTestService()
+	service := setupTestService(t)
 	factory := NewAuthMiddlewareFactory(service, logger)
 
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -216,7 +222,7 @@ func TestAuthMiddlewareFactory_ContextUtilities(t *testing.T) {
 
 func TestAuthMiddlewareFactory_WithValidSession(t *testing.T) {
 	logger := slog.Default()
-	service := setupTestService()
+	service := setupTestService(t)
 	factory := NewAuthMiddlewareFactory(service, logger)
 
 	// Create a user and sign in to get a session

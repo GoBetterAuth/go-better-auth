@@ -9,19 +9,18 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/domain"
 	"github.com/GoBetterAuth/go-better-auth/domain/user"
 	"github.com/GoBetterAuth/go-better-auth/internal/crypto"
-	"github.com/GoBetterAuth/go-better-auth/repository/memory"
+	gobetterauthtests "github.com/GoBetterAuth/go-better-auth/tests"
 )
 
 func TestRequestPasswordReset_SendsEmailWithVerifyEndpoint(t *testing.T) {
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	testUser := createTestUser()
-	userRepo.Create(testUser)
-	accountRepo.Create(createTestAccount(testUser.ID, nil))
+	testUser := gobetterauthtests.CreateTestUser()
+	repos.UserRepo.Create(testUser)
+	repos.AccountRepo.Create(gobetterauthtests.CreateTestAccount(testUser.ID, nil))
 
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 	config.BaseURL = "https://example.com"
 	config.BasePath = "/auth"
 	config.EmailAndPassword = &domain.EmailPasswordConfig{Enabled: true}
@@ -39,7 +38,7 @@ func TestRequestPasswordReset_SendsEmailWithVerifyEndpoint(t *testing.T) {
 		return nil
 	}
 
-	service := NewService(config, userRepo, memory.NewSessionRepository(), accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	resp, err := service.RequestPasswordReset(context.Background(), &RequestPasswordResetRequest{
 		Email:       testUser.Email,
@@ -96,19 +95,19 @@ func TestRequestPasswordReset_SendsEmailWithVerifyEndpoint(t *testing.T) {
 }
 
 func TestRequestPasswordReset_UsesConfiguredExpiry(t *testing.T) {
-	userRepo := memory.NewUserRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	testUser := createTestUser()
-	userRepo.Create(testUser)
+	testUser := gobetterauthtests.CreateTestUser()
+	repos.UserRepo.Create(testUser)
 
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 	config.EmailAndPassword = &domain.EmailPasswordConfig{
 		Enabled:                     true,
 		ResetPasswordTokenExpiresIn: 2 * time.Hour,
 	}
 
-	service := NewService(config, userRepo, memory.NewSessionRepository(), memory.NewAccountRepository(), verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	resp, err := service.RequestPasswordReset(context.Background(), &RequestPasswordResetRequest{Email: testUser.Email})
 	if err != nil {

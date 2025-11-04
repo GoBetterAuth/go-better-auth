@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/GoBetterAuth/go-better-auth/repository/memory"
+	gobetterauthtests "github.com/GoBetterAuth/go-better-auth/tests"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -12,12 +12,15 @@ import (
 // ===== UpdateUser Tests =====
 
 func TestUpdateUser_Valid(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	// First create a user
@@ -49,12 +52,15 @@ func TestUpdateUser_Valid(t *testing.T) {
 }
 
 func TestUpdateUser_UpdateImage(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	// Create a user
@@ -85,12 +91,15 @@ func TestUpdateUser_UpdateImage(t *testing.T) {
 }
 
 func TestUpdateUser_UpdateBothNameAndImage(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	// Create a user
@@ -123,12 +132,15 @@ func TestUpdateUser_UpdateBothNameAndImage(t *testing.T) {
 }
 
 func TestUpdateUser_NilRequest(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	resp, err := service.UpdateUser(nil)
@@ -138,12 +150,15 @@ func TestUpdateUser_NilRequest(t *testing.T) {
 }
 
 func TestUpdateUser_EmptyUserID(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	newName := "Jane Doe"
@@ -159,12 +174,15 @@ func TestUpdateUser_EmptyUserID(t *testing.T) {
 }
 
 func TestUpdateUser_UserNotFound(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	newName := "Jane Doe"
@@ -180,12 +198,15 @@ func TestUpdateUser_UserNotFound(t *testing.T) {
 }
 
 func TestUpdateUser_InvalidName(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	// Create a user
@@ -212,12 +233,15 @@ func TestUpdateUser_InvalidName(t *testing.T) {
 }
 
 func TestUpdateUser_NoChanges(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	// Create a user
@@ -250,12 +274,15 @@ func TestUpdateUser_NoChanges(t *testing.T) {
 // ===== DeleteUser Tests =====
 
 func TestDeleteUser_Valid(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	// Create a user
@@ -284,12 +311,15 @@ func TestDeleteUser_Valid(t *testing.T) {
 }
 
 func TestDeleteUser_WithSessions(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	// Create a user
@@ -334,12 +364,15 @@ func TestDeleteUser_WithSessions(t *testing.T) {
 }
 
 func TestDeleteUser_WithOAuthAccounts(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	// Create a user
@@ -367,12 +400,15 @@ func TestDeleteUser_WithOAuthAccounts(t *testing.T) {
 }
 
 func TestDeleteUser_NilRequest(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	resp, err := service.DeleteUser(nil)
@@ -382,12 +418,15 @@ func TestDeleteUser_NilRequest(t *testing.T) {
 }
 
 func TestDeleteUser_EmptyUserID(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	deleteReq := &DeleteUserRequest{
@@ -401,12 +440,15 @@ func TestDeleteUser_EmptyUserID(t *testing.T) {
 }
 
 func TestDeleteUser_UserNotFound(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	deleteReq := &DeleteUserRequest{
@@ -420,12 +462,15 @@ func TestDeleteUser_UserNotFound(t *testing.T) {
 }
 
 func TestDeleteUser_MultipleSessionsDeleted(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	// Create a user

@@ -2,7 +2,6 @@ package domain
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 	"strings"
 	"time"
@@ -192,11 +191,17 @@ type DatabaseConfig struct {
 	// ConnectionString is the database connection string
 	ConnectionString string
 
-	// DB is an optional custom database connection
-	DB *sql.DB
+	// LogQueries enables SQL query logging for debugging (default: false)
+	LogQueries bool
 
-	// Casing defines the casing strategy for database columns ("camel", "snake")
-	Casing string
+	// MaxOpenConns sets the maximum number of open connections to the database (default: 25)
+	MaxOpenConns int
+
+	// MaxIdleConns sets the maximum number of idle connections (default: 5)
+	MaxIdleConns int
+
+	// ConnMaxLifetime sets the maximum amount of time a connection may be reused in seconds (default: 3600)
+	ConnMaxLifetime int
 }
 
 // RedisConfig holds Redis configuration for secondary storage

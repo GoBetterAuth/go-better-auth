@@ -18,7 +18,7 @@ you have concerns or encounter any unacceptable behavior, please reach out to mt
 
 ### Reporting bugs
 
-We rely on bug reports to enhance this project for all users. To assist us, we have a bug reporting template specifying the necessary details. Ensure you check our [existing bug reports](https://github.com/m-ta97/go-better-auth/issues?q=is%3Aissue+is%3Aopen+label%3Abug) prior to submitting a new one to avoid duplicates.
+We rely on bug reports to enhance this project for all users. To assist us, we have a bug reporting template specifying the necessary details. Ensure you check our [existing bug reports](https://github.com/GoBetterAuth/go-better-auth/issues?q=is%3Aissue+is%3Aopen+label%3Abug) prior to submitting a new one to avoid duplicates.
 
 ### Reporting security issues
 

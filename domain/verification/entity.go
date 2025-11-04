@@ -1,8 +1,14 @@
 package verification
 
 import (
+	"errors"
 	"fmt"
 	"time"
+)
+
+// Error types for verification operations
+var (
+	ErrVerificationNotFound = errors.New("verification not found")
 )
 
 // VerificationType defines the type of verification

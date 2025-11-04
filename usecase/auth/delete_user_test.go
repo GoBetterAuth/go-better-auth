@@ -7,35 +7,33 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/domain"
 	"github.com/GoBetterAuth/go-better-auth/domain/user"
-	"github.com/GoBetterAuth/go-better-auth/repository/memory"
+	gobetterauthtests "github.com/GoBetterAuth/go-better-auth/tests"
 )
 
 func TestDeleteUser_Success(t *testing.T) {
-	config := createTestConfig()
-	userRepo := memory.NewUserRepository()
-	sessionRepo := memory.NewSessionRepository()
-	accountRepo := memory.NewAccountRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	config := gobetterauthtests.CreateTestConfig()
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	// Create a test user
-	user := createTestUser()
-	if err := userRepo.Create(user); err != nil {
+	user := gobetterauthtests.CreateTestUser()
+	if err := repos.UserRepo.Create(user); err != nil {
 		t.Fatalf("failed to create test user: %v", err)
 	}
 
 	// Create a test session for the user
-	session := createTestSession()
+	session := gobetterauthtests.CreateTestSession()
 	session.UserID = user.ID
-	if err := sessionRepo.Create(session); err != nil {
+	if err := repos.SessionRepo.Create(session); err != nil {
 		t.Fatalf("failed to create test session: %v", err)
 	}
 
 	// Create a test account for the user
 	passwordHash := "hashed_password"
-	acc := createTestAccount(user.ID, &passwordHash)
-	if err := accountRepo.Create(acc); err != nil {
+	acc := gobetterauthtests.CreateTestAccount(user.ID, &passwordHash)
+	if err := repos.AccountRepo.Create(acc); err != nil {
 		t.Fatalf("failed to create test account: %v", err)
 	}
 
@@ -52,13 +50,13 @@ func TestDeleteUser_Success(t *testing.T) {
 	}
 
 	// Verify user is deleted
-	_, err = userRepo.FindByID(user.ID)
+	_, err = repos.UserRepo.FindByID(user.ID)
 	if err == nil {
 		t.Fatal("User should be deleted")
 	}
 
 	// Verify sessions are deleted
-	sessions, err := sessionRepo.FindByUserID(user.ID)
+	sessions, err := repos.SessionRepo.FindByUserID(user.ID)
 	if err != nil {
 		t.Fatalf("FindByUserID failed: %v", err)
 	}
@@ -67,7 +65,7 @@ func TestDeleteUser_Success(t *testing.T) {
 	}
 
 	// Verify accounts are deleted
-	accounts, err := accountRepo.FindByUserID(user.ID)
+	accounts, err := repos.AccountRepo.FindByUserID(user.ID)
 	if err != nil {
 		t.Fatalf("FindByUserID failed: %v", err)
 	}
@@ -77,7 +75,10 @@ func TestDeleteUser_Success(t *testing.T) {
 }
 
 func TestDeleteUser_WithBeforeHook_Success(t *testing.T) {
-	config := createTestConfig()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
+	config := gobetterauthtests.CreateTestConfig()
 
 	// Track hook calls
 	beforeHookCalled := false
@@ -94,18 +95,17 @@ func TestDeleteUser_WithBeforeHook_Success(t *testing.T) {
 		},
 	}
 
-	userRepo := memory.NewUserRepository()
 	service := NewService(
 		config,
-		userRepo,
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	// Create a test user
-	user := createTestUser()
-	if err := userRepo.Create(user); err != nil {
+	user := gobetterauthtests.CreateTestUser()
+	if err := repos.UserRepo.Create(user); err != nil {
 		t.Fatalf("failed to create test user: %v", err)
 	}
 
@@ -139,7 +139,10 @@ func TestDeleteUser_WithBeforeHook_Success(t *testing.T) {
 }
 
 func TestDeleteUser_WithAfterHook_Success(t *testing.T) {
-	config := createTestConfig()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
+	config := gobetterauthtests.CreateTestConfig()
 
 	// Track hook calls
 	afterHookCalled := false
@@ -156,18 +159,17 @@ func TestDeleteUser_WithAfterHook_Success(t *testing.T) {
 		},
 	}
 
-	userRepo := memory.NewUserRepository()
 	service := NewService(
 		config,
-		userRepo,
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	// Create a test user
-	user := createTestUser()
-	if err := userRepo.Create(user); err != nil {
+	user := gobetterauthtests.CreateTestUser()
+	if err := repos.UserRepo.Create(user); err != nil {
 		t.Fatalf("failed to create test user: %v", err)
 	}
 
@@ -198,7 +200,10 @@ func TestDeleteUser_WithAfterHook_Success(t *testing.T) {
 }
 
 func TestDeleteUser_WithBothHooks_Success(t *testing.T) {
-	config := createTestConfig()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
+	config := gobetterauthtests.CreateTestConfig()
 
 	// Track hook calls
 	beforeHookCalled := false
@@ -221,18 +226,17 @@ func TestDeleteUser_WithBothHooks_Success(t *testing.T) {
 		},
 	}
 
-	userRepo := memory.NewUserRepository()
 	service := NewService(
 		config,
-		userRepo,
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	// Create a test user
-	user := createTestUser()
-	if err := userRepo.Create(user); err != nil {
+	user := gobetterauthtests.CreateTestUser()
+	if err := repos.UserRepo.Create(user); err != nil {
 		t.Fatalf("failed to create test user: %v", err)
 	}
 
@@ -269,7 +273,10 @@ func TestDeleteUser_WithBothHooks_Success(t *testing.T) {
 }
 
 func TestDeleteUser_BeforeHookError_StopsExecution(t *testing.T) {
-	config := createTestConfig()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
+	config := gobetterauthtests.CreateTestConfig()
 
 	expectedError := fmt.Errorf("before hook error")
 	afterHookCalled := false
@@ -287,18 +294,17 @@ func TestDeleteUser_BeforeHookError_StopsExecution(t *testing.T) {
 		},
 	}
 
-	userRepo := memory.NewUserRepository()
 	service := NewService(
 		config,
-		userRepo,
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	// Create a test user
-	user := createTestUser()
-	if err := userRepo.Create(user); err != nil {
+	user := gobetterauthtests.CreateTestUser()
+	if err := repos.UserRepo.Create(user); err != nil {
 		t.Fatalf("failed to create test user: %v", err)
 	}
 
@@ -315,7 +321,7 @@ func TestDeleteUser_BeforeHookError_StopsExecution(t *testing.T) {
 	}
 
 	// Verify user still exists
-	existingUser, err := userRepo.FindByID(user.ID)
+	existingUser, err := repos.UserRepo.FindByID(user.ID)
 	if err != nil {
 		t.Fatal("User should still exist after failed deletion")
 	}
@@ -330,7 +336,10 @@ func TestDeleteUser_BeforeHookError_StopsExecution(t *testing.T) {
 }
 
 func TestDeleteUser_AfterHookError_ReturnsError(t *testing.T) {
-	config := createTestConfig()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
+	config := gobetterauthtests.CreateTestConfig()
 
 	expectedError := fmt.Errorf("after hook error")
 	beforeHookCalled := false
@@ -348,18 +357,17 @@ func TestDeleteUser_AfterHookError_ReturnsError(t *testing.T) {
 		},
 	}
 
-	userRepo := memory.NewUserRepository()
 	service := NewService(
 		config,
-		userRepo,
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	// Create a test user
-	user := createTestUser()
-	if err := userRepo.Create(user); err != nil {
+	user := gobetterauthtests.CreateTestUser()
+	if err := repos.UserRepo.Create(user); err != nil {
 		t.Fatalf("failed to create test user: %v", err)
 	}
 
@@ -382,28 +390,30 @@ func TestDeleteUser_AfterHookError_ReturnsError(t *testing.T) {
 
 	// Note: User is still deleted even though after hook fails
 	// This is expected behavior - the after hook runs after deletion
-	_, err = userRepo.FindByID(user.ID)
+	_, err = repos.UserRepo.FindByID(user.ID)
 	if err == nil {
 		t.Fatal("User should be deleted even though after hook failed")
 	}
 }
 
 func TestDeleteUser_NoHooksConfigured_Success(t *testing.T) {
-	config := createTestConfig()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
+	config := gobetterauthtests.CreateTestConfig()
 	// Don't configure any hooks
 
-	userRepo := memory.NewUserRepository()
 	service := NewService(
 		config,
-		userRepo,
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	// Create a test user
-	user := createTestUser()
-	if err := userRepo.Create(user); err != nil {
+	user := gobetterauthtests.CreateTestUser()
+	if err := repos.UserRepo.Create(user); err != nil {
 		t.Fatalf("failed to create test user: %v", err)
 	}
 
@@ -420,7 +430,7 @@ func TestDeleteUser_NoHooksConfigured_Success(t *testing.T) {
 	}
 
 	// Verify user is deleted
-	_, err = userRepo.FindByID(user.ID)
+	_, err = repos.UserRepo.FindByID(user.ID)
 	if err == nil {
 		t.Fatal("User should be deleted")
 	}

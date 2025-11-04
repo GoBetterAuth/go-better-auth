@@ -6,14 +6,12 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/domain"
 	"github.com/GoBetterAuth/go-better-auth/internal/crypto"
-	"github.com/GoBetterAuth/go-better-auth/repository/memory"
+	gobetterauthtests "github.com/GoBetterAuth/go-better-auth/tests"
 )
 
 func TestSignIn_Valid(t *testing.T) {
-	userRepo := memory.NewUserRepository()
-	sessionRepo := memory.NewSessionRepository()
-	accountRepo := memory.NewAccountRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
 	// Create a user
 	password := "ValidPassword123!"
@@ -23,18 +21,18 @@ func TestSignIn_Valid(t *testing.T) {
 	}
 
 	// Manually create user and account
-	testUser := createTestUser()
-	if err := userRepo.Create(testUser); err != nil {
+	testUser := gobetterauthtests.CreateTestUser()
+	if err := repos.UserRepo.Create(testUser); err != nil {
 		t.Fatalf("Failed to create test user: %v", err)
 	}
 
-	testAccount := createTestAccount(testUser.ID, &hashedPassword)
-	if err := accountRepo.Create(testAccount); err != nil {
+	testAccount := gobetterauthtests.CreateTestAccount(testUser.ID, &hashedPassword)
+	if err := repos.AccountRepo.Create(testAccount); err != nil {
 		t.Fatalf("Failed to create test account: %v", err)
 	}
 
 	service := NewService(
-		createTestConfig(), userRepo, sessionRepo, accountRepo, verificationRepo)
+		gobetterauthtests.CreateTestConfig(), repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	req := &SignInRequest{
 		Email:     testUser.Email,
@@ -66,21 +64,21 @@ func TestSignIn_Valid(t *testing.T) {
 }
 
 func TestSignIn_InvalidPassword(t *testing.T) {
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
 	// Create a user with a specific password
 	password := "ValidPassword123!"
 	hashedPassword, _ := crypto.HashPassword(password)
 
-	testUser := createTestUser()
-	userRepo.Create(testUser)
+	testUser := gobetterauthtests.CreateTestUser()
+	repos.UserRepo.Create(testUser)
 
-	testAccount := createTestAccount(testUser.ID, &hashedPassword)
-	accountRepo.Create(testAccount)
+	testAccount := gobetterauthtests.CreateTestAccount(testUser.ID, &hashedPassword)
+	repos.AccountRepo.Create(testAccount)
 
 	service := NewService(
-		createTestConfig(), userRepo, memory.NewSessionRepository(), accountRepo, memory.NewVerificationRepository())
+		gobetterauthtests.CreateTestConfig(), repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	req := &SignInRequest{
 		Email:     testUser.Email,
@@ -96,12 +94,15 @@ func TestSignIn_InvalidPassword(t *testing.T) {
 }
 
 func TestSignIn_UserNotFound(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	req := &SignInRequest{
@@ -118,14 +119,15 @@ func TestSignIn_UserNotFound(t *testing.T) {
 }
 
 func TestSignIn_AccountNotFound(t *testing.T) {
-	userRepo := memory.NewUserRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
 	// Create a user without an account
-	testUser := createTestUser()
-	userRepo.Create(testUser)
+	testUser := gobetterauthtests.CreateTestUser()
+	repos.UserRepo.Create(testUser)
 
 	service := NewService(
-		createTestConfig(), userRepo, memory.NewSessionRepository(), memory.NewAccountRepository(), memory.NewVerificationRepository())
+		gobetterauthtests.CreateTestConfig(), repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	req := &SignInRequest{
 		Email:     testUser.Email,
@@ -181,43 +183,55 @@ func TestSignInRequest_Validate(t *testing.T) {
 }
 
 func TestSignOut_Valid(t *testing.T) {
-	sessionRepo := memory.NewSessionRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	// Create a test session
-	testSession := createTestSession()
-	sessionRepo.Create(testSession)
+	// Create a test user first to satisfy foreign key constraint
+	testUser := gobetterauthtests.CreateTestUser()
+	err := repos.UserRepo.Create(testUser)
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Create a test session with the existing user
+	testSession := gobetterauthtests.CreateTestSession()
+	testSession.UserID = testUser.ID
+	repos.SessionRepo.Create(testSession)
 
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		sessionRepo,
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	req := &SignOutRequest{
 		SessionToken: testSession.Token,
 	}
 
-	err := service.SignOut(req)
-	if err != nil {
-		t.Fatalf("SignOut failed: %v", err)
+	signOutErr := service.SignOut(req)
+	if signOutErr != nil {
+		t.Fatalf("SignOut failed: %v", signOutErr)
 	}
 
 	// Verify session is deleted
-	_, err = sessionRepo.FindByToken(testSession.Token)
+	_, err = repos.SessionRepo.FindByToken(testSession.Token)
 	if err == nil {
 		t.Fatal("Expected session to be deleted, but it was found")
 	}
 }
 
 func TestSignOut_InvalidToken(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	req := &SignOutRequest{
@@ -232,10 +246,8 @@ func TestSignOut_InvalidToken(t *testing.T) {
 
 func TestSignIn_WithDisabledSignUp(t *testing.T) {
 	// Verify that existing users can still sign in even when signup is disabled
-	userRepo := memory.NewUserRepository()
-	sessionRepo := memory.NewSessionRepository()
-	accountRepo := memory.NewAccountRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
 	// Create a user
 	password := "ValidPassword123!"
@@ -245,18 +257,18 @@ func TestSignIn_WithDisabledSignUp(t *testing.T) {
 	}
 
 	// Manually create user and account
-	testUser := createTestUser()
-	if err := userRepo.Create(testUser); err != nil {
+	testUser := gobetterauthtests.CreateTestUser()
+	if err := repos.UserRepo.Create(testUser); err != nil {
 		t.Fatalf("Failed to create test user: %v", err)
 	}
 
-	testAccount := createTestAccount(testUser.ID, &hashedPassword)
-	if err := accountRepo.Create(testAccount); err != nil {
+	testAccount := gobetterauthtests.CreateTestAccount(testUser.ID, &hashedPassword)
+	if err := repos.AccountRepo.Create(testAccount); err != nil {
 		t.Fatalf("Failed to create test account: %v", err)
 	}
 
 	// Create config with disabled signup
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 	config.EmailAndPassword = &domain.EmailPasswordConfig{
 		Enabled:                  true,
 		DisableSignUp:            true,
@@ -265,7 +277,7 @@ func TestSignIn_WithDisabledSignUp(t *testing.T) {
 		MaxPasswordLength:        128,
 	}
 
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	req := &SignInRequest{
 		Email:     testUser.Email,

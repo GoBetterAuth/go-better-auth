@@ -18,7 +18,7 @@ func TestAuth_WithSecondaryStorage_SessionCaching(t *testing.T) {
 	// Create secondary storage
 	secondaryStorage := storage.NewInMemorySecondaryStorage()
 
-	// Create auth instance with secondary storage
+	// Create auth instance with secondary storage and auto-migrations
 	config := &domain.Config{
 		Secret:   "test-secret-key-32-characters!",
 		BaseURL:  "http://localhost:3000",
@@ -40,6 +40,12 @@ func TestAuth_WithSecondaryStorage_SessionCaching(t *testing.T) {
 	auth, err := New(config)
 	if err != nil {
 		t.Fatalf("failed to create auth: %v", err)
+	}
+
+	// Run migrations for test setup
+	ctx := context.Background()
+	if err := auth.RunMigrations(ctx); err != nil {
+		t.Fatalf("failed to run migrations: %v", err)
 	}
 
 	handler := auth.Handler()
@@ -288,11 +294,11 @@ func TestAuth_WithoutSecondaryStorage_NoRateLimiting(t *testing.T) {
 	}
 }
 
-func TestAuth_SecondaryStorage_Expiration(t *testing.T) {
+func TestAuth_SecondaryStorage_ConcurrentAccess(t *testing.T) {
 	// Create secondary storage
 	secondaryStorage := storage.NewInMemorySecondaryStorage()
 
-	// Create auth instance with short session expiry
+	// Create auth instance with secondary storage
 	config := &domain.Config{
 		Secret:   "test-secret-key-32-characters!",
 		BaseURL:  "http://localhost:3000",
@@ -314,6 +320,12 @@ func TestAuth_SecondaryStorage_Expiration(t *testing.T) {
 	auth, err := New(config)
 	if err != nil {
 		t.Fatalf("failed to create auth: %v", err)
+	}
+
+	// Run migrations for test setup
+	ctx := context.Background()
+	if err := auth.RunMigrations(ctx); err != nil {
+		t.Fatalf("failed to run migrations: %v", err)
 	}
 
 	handler := auth.Handler()

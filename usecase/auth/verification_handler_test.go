@@ -8,7 +8,7 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/domain/user"
 	"github.com/GoBetterAuth/go-better-auth/domain/verification"
 	"github.com/GoBetterAuth/go-better-auth/internal/crypto"
-	"github.com/GoBetterAuth/go-better-auth/repository/memory"
+	gobetterauthtests "github.com/GoBetterAuth/go-better-auth/tests"
 )
 
 func TestVerifyEmailUnified(t *testing.T) {
@@ -179,12 +179,12 @@ func TestVerifyEmailUnified(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			userRepo := memory.NewUserRepository()
-			verificationRepo := memory.NewVerificationRepository()
+			repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+			defer cleanup()
 
 			// Setup user if provided
 			if tt.setupUser != nil {
-				userRepo.Create(tt.setupUser)
+				repos.UserRepo.Create(tt.setupUser)
 			}
 
 			// Setup verification if provided
@@ -194,18 +194,20 @@ func TestVerifyEmailUnified(t *testing.T) {
 				// Create a copy for storing with hashed token
 				verificationToStore := *tt.setupVerif
 				verificationToStore.Token = crypto.HashVerificationToken(plainToken)
-				verificationRepo.Create(&verificationToStore)
+				repos.VerificationRepo.Create(&verificationToStore)
 			}
 
 			// Setup additional users
 			for _, u := range tt.setupUsers {
-				userRepo.Create(u)
+				repos.UserRepo.Create(u)
 			}
 
 			svc := &Service{
-				config:           createTestConfig(),
-				userRepo:         userRepo,
-				verificationRepo: verificationRepo,
+				config:           gobetterauthtests.CreateTestConfig(),
+				userRepo:         repos.UserRepo,
+				accountRepo:      repos.AccountRepo,
+				sessionRepo:      repos.SessionRepo,
+				verificationRepo: repos.VerificationRepo,
 			}
 
 			ctx := context.Background()
@@ -237,7 +239,7 @@ func TestVerifyEmailUnified(t *testing.T) {
 
 				// For email verification, check that user's email is now verified
 				if tt.setupVerif != nil && tt.setupVerif.Type == verification.TypeEmailVerification && tt.setupUser != nil {
-					updatedUser, _ := userRepo.FindByEmail(tt.setupUser.Email)
+					updatedUser, _ := repos.UserRepo.FindByEmail(tt.setupUser.Email)
 					if updatedUser == nil {
 						t.Fatal("user not found after verification")
 					}
@@ -249,7 +251,7 @@ func TestVerifyEmailUnified(t *testing.T) {
 				// For email change, check that email was updated and token is deleted
 				if tt.setupVerif != nil && tt.setupVerif.Type == verification.TypeEmailChange {
 					if tt.expectedEmailAfter != "" {
-						updatedUser, _ := userRepo.FindByEmail(tt.expectedEmailAfter)
+						updatedUser, _ := repos.UserRepo.FindByEmail(tt.expectedEmailAfter)
 						if updatedUser == nil {
 							t.Fatal("user not found with new email after email change verification")
 						}
@@ -260,7 +262,7 @@ func TestVerifyEmailUnified(t *testing.T) {
 				}
 
 				if tt.setupVerif != nil && tt.setupVerif.Type == verification.TypeEmailChange {
-					tokenAfter, _ := verificationRepo.FindByHashedToken(tt.setupVerif.Token)
+					tokenAfter, _ := repos.VerificationRepo.FindByHashedToken(tt.setupVerif.Token)
 					if tokenAfter != nil {
 						t.Fatal("verification token should be deleted after verification")
 					}
@@ -276,7 +278,7 @@ func TestVerifyEmailUnified(t *testing.T) {
 						t.Fatalf("expected reset token to match hashed version")
 					}
 
-					tokenAfter, _ := verificationRepo.FindByHashedToken(tt.setupVerif.Token)
+					tokenAfter, _ := repos.VerificationRepo.FindByHashedToken(tt.setupVerif.Token)
 					if tokenAfter == nil {
 						t.Fatal("verification token should remain for password reset")
 					}

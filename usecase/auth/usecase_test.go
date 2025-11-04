@@ -8,23 +8,32 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/domain"
 	"github.com/GoBetterAuth/go-better-auth/domain/verification"
 	"github.com/GoBetterAuth/go-better-auth/internal/crypto"
-	"github.com/GoBetterAuth/go-better-auth/repository/memory"
+	gobetterauthtests "github.com/GoBetterAuth/go-better-auth/tests"
 )
 
 func TestValidateSession_Valid(t *testing.T) {
-	sessionRepo := memory.NewSessionRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	// Create a session
-	testSession := createTestSession()
+	// Create a test user first to satisfy foreign key constraint
+	testUser := gobetterauthtests.CreateTestUser()
+	err := repos.UserRepo.Create(testUser)
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Create a session with the existing user
+	testSession := gobetterauthtests.CreateTestSession()
+	testSession.UserID = testUser.ID
 	testSession.ExpiresAt = time.Now().Add(24 * time.Hour) // Make it valid
-	sessionRepo.Create(testSession)
+	repos.SessionRepo.Create(testSession)
 
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		sessionRepo,
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	req := &ValidateSessionRequest{
@@ -50,19 +59,28 @@ func TestValidateSession_Valid(t *testing.T) {
 }
 
 func TestValidateSession_Expired(t *testing.T) {
-	sessionRepo := memory.NewSessionRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	// Create an expired session
-	testSession := createTestSession()
+	// Create a test user first to satisfy foreign key constraint
+	testUser := gobetterauthtests.CreateTestUser()
+	err := repos.UserRepo.Create(testUser)
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	// Create an expired session with the existing user
+	testSession := gobetterauthtests.CreateTestSession()
+	testSession.UserID = testUser.ID
 	testSession.ExpiresAt = time.Now().Add(-1 * time.Hour) // Make it expired
-	sessionRepo.Create(testSession)
+	repos.SessionRepo.Create(testSession)
 
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		sessionRepo,
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	req := &ValidateSessionRequest{
@@ -80,12 +98,15 @@ func TestValidateSession_Expired(t *testing.T) {
 }
 
 func TestValidateSession_NotFound(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	req := &ValidateSessionRequest{
@@ -107,18 +128,27 @@ func TestValidateSession_NotFound(t *testing.T) {
 }
 
 func TestRefreshToken_Valid(t *testing.T) {
-	sessionRepo := memory.NewSessionRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	testSession := createTestSession()
+	// Create a test user first to satisfy foreign key constraint
+	testUser := gobetterauthtests.CreateTestUser()
+	err := repos.UserRepo.Create(testUser)
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	testSession := gobetterauthtests.CreateTestSession()
+	testSession.UserID = testUser.ID
 	testSession.ExpiresAt = time.Now().Add(24 * time.Hour)
-	sessionRepo.Create(testSession)
+	repos.SessionRepo.Create(testSession)
 
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		sessionRepo,
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	oldToken := testSession.Token
@@ -146,55 +176,64 @@ func TestRefreshToken_Valid(t *testing.T) {
 		t.Error("Expected session expiration to be refreshed")
 	}
 
-	_, err = sessionRepo.FindByToken(oldToken)
+	_, err = repos.SessionRepo.FindByToken(oldToken)
 	if err == nil {
 		t.Error("Expected old token to be invalid")
 	}
 
-	foundSession, err := sessionRepo.FindByToken(resp.Session.Token)
+	foundSession, err := repos.SessionRepo.FindByToken(resp.Session.Token)
 	if err != nil || foundSession == nil {
 		t.Error("Expected to find new session token")
 	}
 }
 
 func TestRefreshToken_Expired(t *testing.T) {
-	sessionRepo := memory.NewSessionRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	testSession := createTestSession()
+	// Create a test user first to satisfy foreign key constraint
+	testUser := gobetterauthtests.CreateTestUser()
+	err := repos.UserRepo.Create(testUser)
+	if err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	testSession := gobetterauthtests.CreateTestSession()
+	testSession.UserID = testUser.ID
 	testSession.ExpiresAt = time.Now().Add(-1 * time.Hour)
-	sessionRepo.Create(testSession)
+	repos.SessionRepo.Create(testSession)
 
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		sessionRepo,
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	req := &RefreshTokenRequest{
 		SessionToken: testSession.Token,
 	}
 
-	_, err := service.RefreshToken(req)
-	if err == nil {
+	_, refreshErr := service.RefreshToken(req)
+	if refreshErr == nil {
 		t.Fatal("Expected error for expired session")
 	}
 }
 
 func TestRequestPasswordReset_Valid(t *testing.T) {
-	userRepo := memory.NewUserRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	testUser := createTestUser()
-	userRepo.Create(testUser)
+	testUser := gobetterauthtests.CreateTestUser()
+	repos.UserRepo.Create(testUser)
 
 	service := NewService(
-		createTestConfig(),
-		userRepo,
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		verificationRepo,
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	req := &RequestPasswordResetRequest{
@@ -218,24 +257,23 @@ func TestRequestPasswordReset_Valid(t *testing.T) {
 		t.Errorf("Expected identifier %s, got %s", testUser.Email, resp.Verification.Identifier)
 	}
 
-	v, err := verificationRepo.FindByToken(resp.Verification.Token)
+	v, err := repos.VerificationRepo.FindByToken(resp.Verification.Token)
 	if err != nil || v == nil {
 		t.Error("Expected verification token to be stored")
 	}
 }
 
 func TestResetPassword_Valid(t *testing.T) {
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	testUser := createTestUser()
-	userRepo.Create(testUser)
+	testUser := gobetterauthtests.CreateTestUser()
+	repos.UserRepo.Create(testUser)
 
 	oldPassword := "OldPassword123!"
 	hashedOldPassword, _ := crypto.HashPassword(oldPassword)
-	testAccount := createTestAccount(testUser.ID, &hashedOldPassword)
-	accountRepo.Create(testAccount)
+	testAccount := gobetterauthtests.CreateTestAccount(testUser.ID, &hashedOldPassword)
+	repos.AccountRepo.Create(testAccount)
 
 	resetToken := "reset-token-12345"
 	hashedResetToken := crypto.HashVerificationToken(resetToken)
@@ -248,10 +286,10 @@ func TestResetPassword_Valid(t *testing.T) {
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
-	verificationRepo.Create(v)
+	repos.VerificationRepo.Create(v)
 
 	service := NewService(
-		createTestConfig(), userRepo, memory.NewSessionRepository(), accountRepo, verificationRepo)
+		gobetterauthtests.CreateTestConfig(), repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	req := &ResetPasswordRequest{
 		Token:       resetToken,
@@ -267,7 +305,7 @@ func TestResetPassword_Valid(t *testing.T) {
 		t.Error("Expected reset password to succeed")
 	}
 
-	updatedAccount, err := accountRepo.FindByID(testAccount.ID)
+	updatedAccount, err := repos.AccountRepo.FindByID(testAccount.ID)
 	if err != nil || updatedAccount == nil {
 		t.Fatal("Failed to find updated account")
 	}
@@ -282,19 +320,22 @@ func TestResetPassword_Valid(t *testing.T) {
 		t.Error("New password should match")
 	}
 
-	_, err = verificationRepo.FindByHashedToken(resetToken)
+	_, err = repos.VerificationRepo.FindByHashedToken(resetToken)
 	if err == nil {
 		t.Error("Expected reset token to be deleted")
 	}
 }
 
 func TestResetPassword_InvalidToken(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	req := &ResetPasswordRequest{
@@ -309,17 +350,18 @@ func TestResetPassword_InvalidToken(t *testing.T) {
 }
 
 func TestSendEmailVerification_Valid(t *testing.T) {
-	verificationRepo := memory.NewVerificationRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 	config.EmailVerification.Enabled = true
 
 	service := NewService(
 		config,
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		verificationRepo,
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	email := "verify@example.com"
@@ -338,12 +380,12 @@ func TestSendEmailVerification_Valid(t *testing.T) {
 }
 
 func TestVerifyEmail_Valid(t *testing.T) {
-	userRepo := memory.NewUserRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	testUser := createTestUser()
+	testUser := gobetterauthtests.CreateTestUser()
 	testUser.EmailVerified = false
-	userRepo.Create(testUser)
+	repos.UserRepo.Create(testUser)
 
 	verificationToken := "verify-token-12345"
 	hashedVerificationToken := crypto.HashVerificationToken(verificationToken)
@@ -355,10 +397,10 @@ func TestVerifyEmail_Valid(t *testing.T) {
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
-	verificationRepo.Create(v)
+	repos.VerificationRepo.Create(v)
 
 	service := NewService(
-		createTestConfig(), userRepo, memory.NewSessionRepository(), memory.NewAccountRepository(), verificationRepo)
+		gobetterauthtests.CreateTestConfig(), repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	req := &VerifyEmailRequest{
 		VerificationToken: verificationToken,
@@ -377,7 +419,7 @@ func TestVerifyEmail_Valid(t *testing.T) {
 		t.Fatal("VerifyEmail returned false status")
 	}
 
-	updatedUser, err := userRepo.FindByID(testUser.ID)
+	updatedUser, err := repos.UserRepo.FindByID(testUser.ID)
 	if err != nil || updatedUser == nil {
 		t.Fatal("Failed to find updated user")
 	}
@@ -386,14 +428,15 @@ func TestVerifyEmail_Valid(t *testing.T) {
 		t.Error("Expected email to be verified")
 	}
 
-	_, err = verificationRepo.FindByHashedToken(verificationToken)
+	_, err = repos.VerificationRepo.FindByHashedToken(verificationToken)
 	if err == nil {
 		t.Error("Expected verification token to be deleted")
 	}
 }
 
 func TestVerifyEmail_ExpiredToken(t *testing.T) {
-	verificationRepo := memory.NewVerificationRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
 	expiredToken := "expired-verify-token"
 	v := &verification.Verification{
@@ -404,14 +447,14 @@ func TestVerifyEmail_ExpiredToken(t *testing.T) {
 		CreatedAt:  time.Now().Add(-2 * time.Hour),
 		UpdatedAt:  time.Now().Add(-2 * time.Hour),
 	}
-	verificationRepo.Create(v)
+	repos.VerificationRepo.Create(v)
 
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		verificationRepo,
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	req := &VerifyEmailRequest{
@@ -425,17 +468,18 @@ func TestVerifyEmail_ExpiredToken(t *testing.T) {
 }
 
 func TestGetProfile_Valid(t *testing.T) {
-	userRepo := memory.NewUserRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	testUser := createTestUser()
-	userRepo.Create(testUser)
+	testUser := gobetterauthtests.CreateTestUser()
+	repos.UserRepo.Create(testUser)
 
 	service := NewService(
-		createTestConfig(),
-		userRepo,
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	req := &GetMeRequest{
@@ -461,12 +505,15 @@ func TestGetProfile_Valid(t *testing.T) {
 }
 
 func TestGetProfile_NotFound(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	req := &GetMeRequest{
@@ -480,12 +527,15 @@ func TestGetProfile_NotFound(t *testing.T) {
 }
 
 func TestPasswordHasher_Default(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	password := "test-password-123"
@@ -527,7 +577,7 @@ func TestPasswordHasher_Custom(t *testing.T) {
 		return hash == expected
 	}
 
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 	config.EmailAndPassword = &domain.EmailPasswordConfig{
 		Enabled: true,
 		Password: &domain.PasswordConfig{
@@ -536,12 +586,15 @@ func TestPasswordHasher_Custom(t *testing.T) {
 		},
 	}
 
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
 		config,
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	password := "test-password-123"
@@ -579,7 +632,7 @@ func TestPasswordHasher_CustomHashOnly(t *testing.T) {
 		return "custom-hash-" + password, nil
 	}
 
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 	config.EmailAndPassword = &domain.EmailPasswordConfig{
 		Enabled: true,
 		Password: &domain.PasswordConfig{
@@ -587,12 +640,15 @@ func TestPasswordHasher_CustomHashOnly(t *testing.T) {
 		},
 	}
 
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
 		config,
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	password := "test-password-123"

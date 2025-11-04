@@ -2,32 +2,73 @@ package storage
 
 import (
 	"context"
-	"database/sql"
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
-// TestDBSecondaryStorage_Set tests setting values in database storage
-func TestDBSecondaryStorage_Set(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+// setupTestDB creates an in-memory SQLite database using migration files
+func setupTestDB(t *testing.T) (*DBSecondaryStorage, func()) {
+	// Create GORM instance with SQLite in memory
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
-		t.Skip("SQLite not available (CGO required)")
+		t.Fatalf("failed to connect to test database: %v", err)
 	}
-	defer db.Close()
+
+	// Run migrations from the migration files
+	if err := runTestMigrations(t, db); err != nil {
+		t.Fatalf("failed to run migrations: %v", err)
+	}
 
 	storage, err := NewDBSecondaryStorage(db)
 	if err != nil {
-		t.Skip("SQLite not available")
+		t.Fatalf("failed to create secondary storage: %v", err)
 	}
 
-	// Create table
+	cleanup := func() {
+		sqlDB, err := db.DB()
+		if err == nil {
+			sqlDB.Close()
+		}
+	}
+
+	return storage, cleanup
+}
+
+// runTestMigrations reads and executes the SQLite migration files
+func runTestMigrations(t *testing.T, db *gorm.DB) error {
+	// Get the project root directory
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("failed to get current file path")
+	}
+
+	// Navigate to project root (go up from storage/ to project root)
+	projectRoot := filepath.Dir(filepath.Dir(filename))
+	migrationPath := filepath.Join(projectRoot, "migrations", "sqlite", "000001_initial_schema.up.sql")
+
+	// Read the migration file
+	migrationSQL, err := os.ReadFile(migrationPath)
+	if err != nil {
+		return err
+	}
+
+	// Execute the migration SQL
+	return db.Exec(string(migrationSQL)).Error
+}
+
+// TestDBSecondaryStorage_Set tests setting values in database storage
+func TestDBSecondaryStorage_Set(t *testing.T) {
+	storage, cleanup := setupTestDB(t)
+	defer cleanup()
 	ctx := context.Background()
-	err = storage.CreateTable(ctx)
-	require.NoError(t, err)
 
 	tests := []struct {
 		name      string
@@ -73,20 +114,9 @@ func TestDBSecondaryStorage_Set(t *testing.T) {
 
 // TestDBSecondaryStorage_Get tests retrieving values from database storage
 func TestDBSecondaryStorage_Get(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Skip("SQLite not available (CGO required)")
-	}
-	defer db.Close()
-
-	storage, err := NewDBSecondaryStorage(db)
-	if err != nil {
-		t.Skip("SQLite not available")
-	}
-
+	storage, cleanup := setupTestDB(t)
+	defer cleanup()
 	ctx := context.Background()
-	err = storage.CreateTable(ctx)
-	require.NoError(t, err)
 
 	// Set test data
 	storage.Set(ctx, "db:get1", "test-value", 0)
@@ -126,20 +156,9 @@ func TestDBSecondaryStorage_Get(t *testing.T) {
 
 // TestDBSecondaryStorage_Delete tests deleting values from database storage
 func TestDBSecondaryStorage_Delete(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Skip("SQLite not available (CGO required)")
-	}
-	defer db.Close()
-
-	storage, err := NewDBSecondaryStorage(db)
-	if err != nil {
-		t.Skip("SQLite not available")
-	}
-
+	storage, cleanup := setupTestDB(t)
+	defer cleanup()
 	ctx := context.Background()
-	err = storage.CreateTable(ctx)
-	require.NoError(t, err)
 
 	tests := []struct {
 		name      string
@@ -182,26 +201,15 @@ func TestDBSecondaryStorage_Delete(t *testing.T) {
 
 // TestDBSecondaryStorage_TTL tests TTL expiration in database storage
 func TestDBSecondaryStorage_TTL(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Skip("SQLite not available (CGO required)")
-	}
-	defer db.Close()
-
-	storage, err := NewDBSecondaryStorage(db)
-	if err != nil {
-		t.Skip("SQLite not available")
-	}
-
+	storage, cleanup := setupTestDB(t)
+	defer cleanup()
 	ctx := context.Background()
-	err = storage.CreateTable(ctx)
-	require.NoError(t, err)
 
 	key := "db:ttl-key"
 	value := "short-lived"
 
 	// Set value with 1 second TTL
-	err = storage.Set(ctx, key, value, 1)
+	err := storage.Set(ctx, key, value, 1)
 	require.NoError(t, err)
 
 	// Value should exist immediately
@@ -219,25 +227,14 @@ func TestDBSecondaryStorage_TTL(t *testing.T) {
 
 // TestDBSecondaryStorage_Upsert tests updating existing values
 func TestDBSecondaryStorage_Upsert(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Skip("SQLite not available (CGO required)")
-	}
-	defer db.Close()
-
-	storage, err := NewDBSecondaryStorage(db)
-	if err != nil {
-		t.Skip("SQLite not available")
-	}
-
+	storage, cleanup := setupTestDB(t)
+	defer cleanup()
 	ctx := context.Background()
-	err = storage.CreateTable(ctx)
-	require.NoError(t, err)
 
 	key := "db:upsert-key"
 
 	// First insert
-	err = storage.Set(ctx, key, "value1", 0)
+	err := storage.Set(ctx, key, "value1", 0)
 	require.NoError(t, err)
 
 	val, err := storage.Get(ctx, key)
@@ -255,25 +252,14 @@ func TestDBSecondaryStorage_Upsert(t *testing.T) {
 
 // TestDBSecondaryStorage_EmptyValue tests storing empty values
 func TestDBSecondaryStorage_EmptyValue(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Skip("SQLite not available (CGO required)")
-	}
-	defer db.Close()
-
-	storage, err := NewDBSecondaryStorage(db)
-	if err != nil {
-		t.Skip("SQLite not available")
-	}
-
+	storage, cleanup := setupTestDB(t)
+	defer cleanup()
 	ctx := context.Background()
-	err = storage.CreateTable(ctx)
-	require.NoError(t, err)
 
 	key := "db:empty-key"
 
 	// Store empty string
-	err = storage.Set(ctx, key, "", 0)
+	err := storage.Set(ctx, key, "", 0)
 	require.NoError(t, err)
 
 	val, err := storage.Get(ctx, key)

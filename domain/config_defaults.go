@@ -1,8 +1,6 @@
 package domain
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"os"
 	"strings"
 	"time"
@@ -45,20 +43,23 @@ func (c *Config) ApplyDefaults() {
 	if c.Secret == "" {
 		c.Secret = os.Getenv("GO_BETTER_AUTH_SECRET")
 		if c.Secret == "" {
-			c.Secret = os.Getenv("AUTH_SECRET")
-		}
-		if c.Secret == "" {
 			// In production, this should error
 			if os.Getenv("GO_ENV") == "production" || os.Getenv("ENV") == "production" {
-				panic("SECRET is required in production. Set GO_BETTER_AUTH_SECRET or AUTH_SECRET environment variable")
+				panic("SECRET is required in production. Set GO_BETTER_AUTH_SECRET environment variable")
 			}
 			c.Secret = DefaultSecret
 		}
 	}
 
 	// Apply Database defaults
-	if c.Database.Casing == "" {
-		c.Database.Casing = "snake"
+	if c.Database.MaxOpenConns == 0 {
+		c.Database.MaxOpenConns = 25
+	}
+	if c.Database.MaxIdleConns == 0 {
+		c.Database.MaxIdleConns = 5
+	}
+	if c.Database.ConnMaxLifetime == 0 {
+		c.Database.ConnMaxLifetime = 3600 // 1 hour
 	}
 
 	// Apply EmailVerification defaults
@@ -209,10 +210,10 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	if c.Database.DB == nil && c.Database.ConnectionString == "" {
+	if c.Database.ConnectionString == "" {
 		return &AuthError{
 			Code:    "invalid_config",
-			Message: "Either Database.DB or Database.ConnectionString must be provided",
+			Message: "Database.ConnectionString is required",
 			Status:  500,
 		}
 	}
@@ -311,13 +312,4 @@ func matchWildcard(pattern, str string) bool {
 	}
 
 	return patternHost == strHost
-}
-
-// GenerateSecret generates a random secret key
-func GenerateSecret() (string, error) {
-	bytes := make([]byte, 30)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", err
-	}
-	return base64.StdEncoding.EncodeToString(bytes), nil
 }

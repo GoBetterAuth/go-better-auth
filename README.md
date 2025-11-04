@@ -73,9 +73,3 @@ Your contributions are welcome! Here's how you can get involved:
 - [Discord Server](https://discord.gg/nThBksdr2Z)
 
 ---
-
-### License
-
-Apache 2.0 License - see LICENSE file for details
-
----

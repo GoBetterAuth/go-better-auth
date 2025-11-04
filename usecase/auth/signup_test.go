@@ -7,16 +7,19 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/domain"
 	"github.com/GoBetterAuth/go-better-auth/domain/account"
-	"github.com/GoBetterAuth/go-better-auth/repository/memory"
+	gobetterauthtests "github.com/GoBetterAuth/go-better-auth/tests"
 )
 
 func TestSignUp_Valid(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	req := &SignUpRequest{
@@ -52,12 +55,15 @@ func TestSignUp_Valid(t *testing.T) {
 }
 
 func TestSignUp_DuplicateEmail(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	req1 := &SignUpRequest{
@@ -86,12 +92,15 @@ func TestSignUp_DuplicateEmail(t *testing.T) {
 }
 
 func TestSignUp_InvalidEmail(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	tests := []struct {
@@ -119,12 +128,15 @@ func TestSignUp_InvalidEmail(t *testing.T) {
 }
 
 func TestSignUp_InvalidPassword(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	tests := []struct {
@@ -153,12 +165,15 @@ func TestSignUp_InvalidPassword(t *testing.T) {
 }
 
 func TestSignUp_InvalidName(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	req := &SignUpRequest{
@@ -174,15 +189,15 @@ func TestSignUp_InvalidName(t *testing.T) {
 }
 
 func TestSignUp_PasswordHashing(t *testing.T) {
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
 	service := NewService(
-		createTestConfig(),
-		userRepo,
-		memory.NewSessionRepository(),
-		accountRepo,
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	req := &SignUpRequest{
@@ -197,7 +212,7 @@ func TestSignUp_PasswordHashing(t *testing.T) {
 	}
 
 	// Find the account and verify password is hashed
-	acc, err := accountRepo.FindByUserIDAndProvider(resp.User.ID, account.ProviderCredential)
+	acc, err := repos.AccountRepo.FindByUserIDAndProvider(resp.User.ID, account.ProviderCredential)
 	if err != nil {
 		t.Fatalf("Failed to find account: %v", err)
 	}
@@ -218,15 +233,15 @@ func TestSignUp_PasswordHashing(t *testing.T) {
 }
 
 func TestSignUp_CreatedAccountWithProvider(t *testing.T) {
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
 	service := NewService(
-		createTestConfig(),
-		userRepo,
-		memory.NewSessionRepository(),
-		accountRepo,
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	req := &SignUpRequest{
@@ -241,7 +256,7 @@ func TestSignUp_CreatedAccountWithProvider(t *testing.T) {
 	}
 
 	// Find the account
-	acc, err := accountRepo.FindByUserIDAndProvider(resp.User.ID, account.ProviderCredential)
+	acc, err := repos.AccountRepo.FindByUserIDAndProvider(resp.User.ID, account.ProviderCredential)
 	if err != nil {
 		t.Fatalf("Failed to find account: %v", err)
 	}
@@ -260,12 +275,15 @@ func TestSignUp_CreatedAccountWithProvider(t *testing.T) {
 }
 
 func TestSignUp_TimestampsSet(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
 	service := NewService(
-		createTestConfig(),
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		gobetterauthtests.CreateTestConfig(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	beforeTime := time.Now()
@@ -353,7 +371,10 @@ func TestSignUpRequest_Validate(t *testing.T) {
 }
 
 func TestSignUp_Disabled(t *testing.T) {
-	config := createTestConfig()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
+	config := gobetterauthtests.CreateTestConfig()
 	config.EmailAndPassword = &domain.EmailPasswordConfig{
 		Enabled:                  true,
 		DisableSignUp:            true,
@@ -364,10 +385,10 @@ func TestSignUp_Disabled(t *testing.T) {
 
 	service := NewService(
 		config,
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	req := &SignUpRequest{

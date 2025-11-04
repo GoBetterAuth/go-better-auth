@@ -3,35 +3,32 @@ package auth
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/domain/account"
-	"github.com/GoBetterAuth/go-better-auth/domain/user"
-	"github.com/GoBetterAuth/go-better-auth/repository/memory"
+	gobetterauthtests "github.com/GoBetterAuth/go-better-auth/tests"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestSyncProviderData_UpdateUserProfile(t *testing.T) {
 	ctx := context.Background()
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	sessionRepo := memory.NewSessionRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
-	// Create a user
-	newUser := &user.User{
-		Name:      "Old Name",
-		Email:     "user@example.com",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	err := userRepo.Create(newUser)
+	// Create a user via SignUp to ensure proper ID generation
+	signupResp, err := service.SignUp(ctx, &SignUpRequest{
+		Email:    "user@example.com",
+		Password: "ValidPassword123!",
+		Name:     "Old Name",
+	})
 	require.NoError(t, err)
+	require.NotNil(t, signupResp)
+
+	newUser := signupResp.User
 
 	// Link OAuth account
 	linkReq := &LinkOAuthAccountRequest{
@@ -70,24 +67,23 @@ func TestSyncProviderData_UpdateUserProfile(t *testing.T) {
 
 func TestSyncProviderData_NoChanges(t *testing.T) {
 	ctx := context.Background()
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	sessionRepo := memory.NewSessionRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
-	// Create a user
-	newUser := &user.User{
-		Name:      "Test User",
-		Email:     "user@example.com",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	err := userRepo.Create(newUser)
+	// Create a user via SignUp to ensure proper ID generation
+	signupResp, err := service.SignUp(ctx, &SignUpRequest{
+		Email:    "user@example.com",
+		Password: "ValidPassword123!",
+		Name:     "Test User",
+	})
 	require.NoError(t, err)
+	require.NotNil(t, signupResp)
+
+	newUser := signupResp.User
 
 	// Link OAuth account
 	linkReq := &LinkOAuthAccountRequest{
@@ -123,24 +119,23 @@ func TestSyncProviderData_NoChanges(t *testing.T) {
 
 func TestSyncProviderData_LinkedAccountNotFound(t *testing.T) {
 	ctx := context.Background()
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	sessionRepo := memory.NewSessionRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
-	// Create a user without linking an account
-	newUser := &user.User{
-		Name:      "Test User",
-		Email:     "user@example.com",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	err := userRepo.Create(newUser)
+	// Create a user without linking an account via SignUp to ensure proper ID generation
+	signupResp, err := service.SignUp(ctx, &SignUpRequest{
+		Email:    "user@example.com",
+		Password: "ValidPassword123!",
+		Name:     "Test User",
+	})
 	require.NoError(t, err)
+	require.NotNil(t, signupResp)
+
+	newUser := signupResp.User
 
 	// Try to sync provider data for a non-existent linked account
 	syncReq := &SyncProviderDataRequest{
@@ -161,14 +156,12 @@ func TestSyncProviderData_LinkedAccountNotFound(t *testing.T) {
 
 func TestSyncProviderData_UserNotFound(t *testing.T) {
 	ctx := context.Background()
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	sessionRepo := memory.NewSessionRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
 	// Try to sync provider data for a non-existent user
 	syncReq := &SyncProviderDataRequest{
@@ -189,24 +182,23 @@ func TestSyncProviderData_UserNotFound(t *testing.T) {
 
 func TestSyncMultipleProvidersData(t *testing.T) {
 	ctx := context.Background()
-	config := createTestConfig()
+	config := gobetterauthtests.CreateTestConfig()
 
-	userRepo := memory.NewUserRepository()
-	accountRepo := memory.NewAccountRepository()
-	sessionRepo := memory.NewSessionRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
-	service := NewService(config, userRepo, sessionRepo, accountRepo, verificationRepo)
+	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
-	// Create a user
-	newUser := &user.User{
-		Name:      "Old Name",
-		Email:     "user@example.com",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	err := userRepo.Create(newUser)
+	// Create a user via SignUp to ensure proper ID generation
+	signupResp, err := service.SignUp(ctx, &SignUpRequest{
+		Email:    "user@example.com",
+		Password: "ValidPassword123!",
+		Name:     "Old Name",
+	})
 	require.NoError(t, err)
+	require.NotNil(t, signupResp)
+
+	newUser := signupResp.User
 
 	// Link multiple OAuth accounts
 	providers := map[account.ProviderType]string{

@@ -9,29 +9,35 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/GoBetterAuth/go-better-auth/domain"
 	"github.com/GoBetterAuth/go-better-auth/domain/user"
 	"github.com/GoBetterAuth/go-better-auth/domain/verification"
 	"github.com/GoBetterAuth/go-better-auth/internal/crypto"
-	"github.com/GoBetterAuth/go-better-auth/repository/memory"
+	gobetterauthtests "github.com/GoBetterAuth/go-better-auth/tests"
 	"github.com/GoBetterAuth/go-better-auth/usecase/auth"
 )
 
-func setupTestService() *auth.Service {
-	config := &domain.Config{}
-	config.ApplyDefaults()
+func setupTestService(t *testing.T) *auth.Service {
+	t.Helper()
+
+	config := gobetterauthtests.CreateTestConfig()
+
+	testRepos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	t.Cleanup(cleanup)
 
 	return auth.NewService(
 		config,
-		memory.NewUserRepository(),
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		memory.NewVerificationRepository(),
+		testRepos.UserRepo,
+		testRepos.SessionRepo,
+		testRepos.AccountRepo,
+		testRepos.VerificationRepo,
 	)
 }
 
 func TestSignUpHandler_Valid(t *testing.T) {
-	service := setupTestService()
+	service := setupTestService(t)
 	handler := SignUpHandler(service)
 
 	req := SignUpRequest{
@@ -69,7 +75,7 @@ func TestSignUpHandler_Valid(t *testing.T) {
 }
 
 func TestSignUpHandler_InvalidMethod(t *testing.T) {
-	svc := setupTestService()
+	svc := setupTestService(t)
 	handler := SignUpHandler(svc)
 
 	httpReq := httptest.NewRequest(http.MethodGet, "/auth/signup", nil)
@@ -83,7 +89,7 @@ func TestSignUpHandler_InvalidMethod(t *testing.T) {
 }
 
 func TestSignUpHandler_InvalidBody(t *testing.T) {
-	svc := setupTestService()
+	svc := setupTestService(t)
 	handler := SignUpHandler(svc)
 
 	httpReq := httptest.NewRequest(http.MethodPost, "/auth/signup", bytes.NewReader([]byte("invalid json")))
@@ -97,7 +103,7 @@ func TestSignUpHandler_InvalidBody(t *testing.T) {
 }
 
 func TestSignUpHandler_DuplicateEmail(t *testing.T) {
-	svc := setupTestService()
+	svc := setupTestService(t)
 
 	// Create first user
 	req1 := SignUpRequest{
@@ -127,7 +133,7 @@ func TestSignUpHandler_DuplicateEmail(t *testing.T) {
 }
 
 func TestSignInHandler_Valid(t *testing.T) {
-	svc := setupTestService()
+	svc := setupTestService(t)
 
 	// Sign up first
 	signupReq := SignUpRequest{
@@ -164,7 +170,7 @@ func TestSignInHandler_Valid(t *testing.T) {
 }
 
 func TestSignInHandler_InvalidPassword(t *testing.T) {
-	svc := setupTestService()
+	svc := setupTestService(t)
 
 	// Sign up first
 	signupReq := SignUpRequest{
@@ -194,7 +200,7 @@ func TestSignInHandler_InvalidPassword(t *testing.T) {
 }
 
 func TestSignOutHandler_Valid(t *testing.T) {
-	svc := setupTestService()
+	svc := setupTestService(t)
 
 	// Sign up and sign in
 	signupReq := SignUpRequest{
@@ -238,7 +244,7 @@ func TestSignOutHandler_Valid(t *testing.T) {
 }
 
 func TestValidateSessionHandler_Valid(t *testing.T) {
-	svc := setupTestService()
+	svc := setupTestService(t)
 
 	// Sign up and sign in to get token
 	signupReq := SignUpRequest{
@@ -290,7 +296,7 @@ func TestValidateSessionHandler_Valid(t *testing.T) {
 }
 
 func TestValidateSessionHandler_InvalidToken(t *testing.T) {
-	svc := setupTestService()
+	svc := setupTestService(t)
 
 	validateHttpReq := httptest.NewRequest(http.MethodPost, "/auth/validate", nil)
 	validateHttpReq.Header.Set("Authorization", "Bearer invalid-token")
@@ -338,9 +344,9 @@ func TestResponseEnvelope_Error(t *testing.T) {
 // Email Verification Tests
 
 func TestVerifyEmailGetHandler_ValidToken(t *testing.T) {
-	// Setup
-	userRepo := memory.NewUserRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	// Setup repositories
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
 	// Create a user
 	testUser := &user.User{
@@ -349,7 +355,8 @@ func TestVerifyEmailGetHandler_ValidToken(t *testing.T) {
 		EmailVerified: false,
 		Name:          "Test User",
 	}
-	userRepo.Create(testUser)
+	err := repos.UserRepo.Create(testUser)
+	require.NoError(t, err)
 
 	// Create verification token
 	verificationToken := "valid-token-12345"
@@ -360,18 +367,20 @@ func TestVerifyEmailGetHandler_ValidToken(t *testing.T) {
 		ExpiresAt:  time.Now().Add(24 * time.Hour),
 		CreatedAt:  time.Now(),
 	}
-	verificationRepo.Create(v)
+	err = repos.VerificationRepo.Create(v)
+	require.NoError(t, err)
 
+	// Create service with configuration for this test
 	config := &domain.Config{}
 	config.ApplyDefaults()
 	config.BaseURL = "https://example.com"
 
 	service := auth.NewService(
 		config,
-		userRepo,
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		verificationRepo,
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	handler := VerifyEmailHandler(service)
@@ -388,20 +397,20 @@ func TestVerifyEmailGetHandler_ValidToken(t *testing.T) {
 	}
 
 	// Verify user email is now verified
-	verifiedUser, _ := userRepo.FindByID(testUser.ID)
+	verifiedUser, _ := repos.UserRepo.FindByID(testUser.ID)
 	if !verifiedUser.EmailVerified {
 		t.Error("Expected user email to be verified")
 	}
 
 	// Verify token is deleted
-	_, err := verificationRepo.FindByHashedToken(verificationToken)
+	_, err = repos.VerificationRepo.FindByHashedToken(verificationToken)
 	if err == nil {
 		t.Error("Expected verification token to be deleted")
 	}
 }
 
 func TestVerifyEmailGetHandler_MissingToken(t *testing.T) {
-	service := setupTestService()
+	service := setupTestService(t)
 	handler := VerifyEmailHandler(service)
 
 	httpReq := httptest.NewRequest(http.MethodGet, "/auth/verify-email", nil)
@@ -415,7 +424,7 @@ func TestVerifyEmailGetHandler_MissingToken(t *testing.T) {
 }
 
 func TestVerifyEmailGetHandler_InvalidToken(t *testing.T) {
-	service := setupTestService()
+	service := setupTestService(t)
 	handler := VerifyEmailHandler(service)
 
 	httpReq := httptest.NewRequest(http.MethodGet, "/auth/verify-email?token=invalid-token", nil)
@@ -430,9 +439,9 @@ func TestVerifyEmailGetHandler_InvalidToken(t *testing.T) {
 }
 
 func TestVerifyEmailGetHandler_ExpiredToken(t *testing.T) {
-	// Setup
-	userRepo := memory.NewUserRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	// Setup repositories
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
 	// Create a user
 	testUser := &user.User{
@@ -441,7 +450,8 @@ func TestVerifyEmailGetHandler_ExpiredToken(t *testing.T) {
 		EmailVerified: false,
 		Name:          "Test User",
 	}
-	userRepo.Create(testUser)
+	err := repos.UserRepo.Create(testUser)
+	require.NoError(t, err)
 
 	// Create expired verification token
 	verificationToken := "expired-token-12345"
@@ -452,17 +462,18 @@ func TestVerifyEmailGetHandler_ExpiredToken(t *testing.T) {
 		ExpiresAt:  time.Now().Add(-1 * time.Hour), // Expired 1 hour ago
 		CreatedAt:  time.Now().Add(-2 * time.Hour),
 	}
-	verificationRepo.Create(v)
+	err = repos.VerificationRepo.Create(v)
+	require.NoError(t, err)
 
 	config := &domain.Config{}
 	config.ApplyDefaults()
 
 	service := auth.NewService(
 		config,
-		userRepo,
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		verificationRepo,
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	handler := VerifyEmailHandler(service)
@@ -478,7 +489,7 @@ func TestVerifyEmailGetHandler_ExpiredToken(t *testing.T) {
 }
 
 func TestVerifyEmailGetHandler_InvalidMethod(t *testing.T) {
-	service := setupTestService()
+	service := setupTestService(t)
 	handler := VerifyEmailHandler(service)
 
 	// Test with invalid method (PUT)
@@ -493,9 +504,9 @@ func TestVerifyEmailGetHandler_InvalidMethod(t *testing.T) {
 }
 
 func TestVerifyEmailGetHandler_CustomRedirectURL(t *testing.T) {
-	// Setup
-	userRepo := memory.NewUserRepository()
-	verificationRepo := memory.NewVerificationRepository()
+	// Setup repositories
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
 
 	// Create a user
 	testUser := &user.User{
@@ -504,7 +515,8 @@ func TestVerifyEmailGetHandler_CustomRedirectURL(t *testing.T) {
 		EmailVerified: false,
 		Name:          "Test User",
 	}
-	userRepo.Create(testUser)
+	err := repos.UserRepo.Create(testUser)
+	require.NoError(t, err)
 
 	// Create verification token
 	verificationToken := "valid-token-12345"
@@ -515,7 +527,8 @@ func TestVerifyEmailGetHandler_CustomRedirectURL(t *testing.T) {
 		ExpiresAt:  time.Now().Add(24 * time.Hour),
 		CreatedAt:  time.Now(),
 	}
-	verificationRepo.Create(v)
+	err = repos.VerificationRepo.Create(v)
+	require.NoError(t, err)
 
 	config := &domain.Config{}
 	config.ApplyDefaults()
@@ -527,10 +540,10 @@ func TestVerifyEmailGetHandler_CustomRedirectURL(t *testing.T) {
 
 	service := auth.NewService(
 		config,
-		userRepo,
-		memory.NewSessionRepository(),
-		memory.NewAccountRepository(),
-		verificationRepo,
+		repos.UserRepo,
+		repos.SessionRepo,
+		repos.AccountRepo,
+		repos.VerificationRepo,
 	)
 
 	handler := VerifyEmailHandler(service)

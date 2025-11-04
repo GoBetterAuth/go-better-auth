@@ -1,23 +1,23 @@
 package gobetterauth
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/adapter"
-	"github.com/GoBetterAuth/go-better-auth/adapter/postgres"
-	"github.com/GoBetterAuth/go-better-auth/adapter/sqlite"
 	"github.com/GoBetterAuth/go-better-auth/domain"
 	"github.com/GoBetterAuth/go-better-auth/domain/security"
 	"github.com/GoBetterAuth/go-better-auth/domain/session"
 	"github.com/GoBetterAuth/go-better-auth/handler"
+	"github.com/GoBetterAuth/go-better-auth/infrastructure/migration"
 	"github.com/GoBetterAuth/go-better-auth/internal/crypto"
 	"github.com/GoBetterAuth/go-better-auth/middleware"
 	"github.com/GoBetterAuth/go-better-auth/repository"
 	"github.com/GoBetterAuth/go-better-auth/repository/cached"
+	gormrepo "github.com/GoBetterAuth/go-better-auth/repository/gorm"
 	"github.com/GoBetterAuth/go-better-auth/repository/memory"
 	"github.com/GoBetterAuth/go-better-auth/repository/secondary"
 	"github.com/GoBetterAuth/go-better-auth/storage"
@@ -32,7 +32,7 @@ type Auth struct {
 	secretGenerator *crypto.SecretGenerator
 	passwordHasher  *crypto.Argon2PasswordHasher
 	cipherManager   *crypto.CipherManager
-	adapter         adapter.Adapter
+	repositories    *gormrepo.Repositories
 }
 
 // New creates a new instance of the authentication system
@@ -60,10 +60,10 @@ func New(config *domain.Config) (*Auth, error) {
 		cipherManager = cm
 	}
 
-	// Create database adapter
-	dbAdapter, err := createAdapter(config)
+	// Create GORM repositories
+	repositories, err := createRepositories(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create adapter: %w", err)
+		return nil, fmt.Errorf("failed to create repositories: %w", err)
 	}
 
 	// Create the auth instance
@@ -72,65 +72,61 @@ func New(config *domain.Config) (*Auth, error) {
 		secretGenerator: crypto.NewSecretGenerator(),
 		passwordHasher:  crypto.NewArgon2PasswordHasher(),
 		cipherManager:   cipherManager,
-		adapter:         dbAdapter,
+		repositories:    repositories,
 	}
 
 	return auth, nil
 }
 
-// createAdapter creates the appropriate database adapter based on configuration
-// Redis can be configured as secondary storage for sessions and rate limiting,
-// but a primary database (sqlite or postgres) is always required.
-func createAdapter(cfg *domain.Config) (adapter.Adapter, error) {
-	provider := strings.ToLower(cfg.Database.Provider)
-
-	adapterCfg := &adapter.Config{
-		DSN:             cfg.Database.ConnectionString,
-		MaxOpenConns:    25,   // default connection pool size
-		MaxIdleConns:    5,    // default idle connections
-		ConnMaxLifetime: 3600, // default 1 hour
-		AutoMigrate:     true,
-		LogQueries:      false,
+// createRepositories creates GORM repositories based on configuration
+func createRepositories(cfg *domain.Config) (*gormrepo.Repositories, error) {
+	gormCfg := &gormrepo.Config{
+		Provider:         strings.ToLower(cfg.Database.Provider),
+		ConnectionString: cfg.Database.ConnectionString,
+		LogQueries:       cfg.Database.LogQueries,
+		MaxOpenConns:     cfg.Database.MaxOpenConns,
+		MaxIdleConns:     cfg.Database.MaxIdleConns,
+		ConnMaxLifetime:  cfg.Database.ConnMaxLifetime,
 	}
 
-	// Create primary adapter
-	var primaryAdapter adapter.Adapter
-	var err error
-
-	switch provider {
-	case "sqlite":
-		primaryAdapter, err = sqlite.NewSQLiteAdapter(adapterCfg)
-	case "postgres":
-		primaryAdapter, err = postgres.NewPostgresAdapter(adapterCfg)
-	default:
-		return nil, fmt.Errorf("unsupported database provider: %s (must be 'sqlite' or 'postgres')", provider)
-	}
-
+	repositories, err := gormrepo.NewRepositories(gormCfg)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create repositories: %w", err)
 	}
 
-	return primaryAdapter, nil
+	return repositories, nil
 }
 
 // Config returns the configuration
-func (a *Auth) Config() *domain.Config {
-	return a.config
+func (auth *Auth) Config() *domain.Config {
+	return auth.config
+}
+
+// RunMigrations runs database migrations for the authentication system.
+// This is primarily intended for testing environments where automatic
+// migrations are needed.
+func (auth *Auth) RunMigrations(ctx context.Context) error {
+	if auth.repositories == nil {
+		return fmt.Errorf("repositories not initialized")
+	}
+
+	provider := strings.ToLower(auth.config.Database.Provider)
+	return migration.RunTestMigrations(auth.repositories.DB, provider)
 }
 
 // SecretGenerator returns the secret generator
-func (a *Auth) SecretGenerator() *crypto.SecretGenerator {
-	return a.secretGenerator
+func (auth *Auth) SecretGenerator() *crypto.SecretGenerator {
+	return auth.secretGenerator
 }
 
 // PasswordHasher returns the password hasher
-func (a *Auth) PasswordHasher() *crypto.Argon2PasswordHasher {
-	return a.passwordHasher
+func (auth *Auth) PasswordHasher() *crypto.Argon2PasswordHasher {
+	return auth.passwordHasher
 }
 
 // CipherManager returns the cipher manager for encryption and signing
-func (a *Auth) CipherManager() *crypto.CipherManager {
-	return a.cipherManager
+func (auth *Auth) CipherManager() *crypto.CipherManager {
+	return auth.cipherManager
 }
 
 // Handler returns an http.Handler that implements all authentication endpoints.
@@ -139,13 +135,13 @@ func (a *Auth) CipherManager() *crypto.CipherManager {
 // If secondary storage is configured, it will be used for session caching and rate limiting.
 func (a *Auth) Handler() http.Handler {
 	// Get repositories
-	userRepo := a.adapter.UserRepository()
-	accountRepo := a.adapter.AccountRepository()
-	verificationRepo := a.adapter.VerificationRepository()
+	userRepo := a.repositories.UserRepo
+	accountRepo := a.repositories.AccountRepo
+	verificationRepo := a.repositories.VerificationRepo
 
 	// Wrap session repository with caching if secondary storage is available
 	var sessionRepo session.Repository
-	sessionRepo = a.adapter.SessionRepository()
+	sessionRepo = a.repositories.SessionRepo
 	if a.config.SecondaryStorage != nil {
 		sessionRepo = cached.NewSessionRepository(sessionRepo, a.config.SecondaryStorage)
 	}
@@ -268,13 +264,13 @@ func (a *Auth) Handler() http.Handler {
 // This is used internally by middleware factory methods
 func (a *Auth) authService() *auth.Service {
 	// Get repositories
-	userRepo := a.adapter.UserRepository()
-	accountRepo := a.adapter.AccountRepository()
-	verificationRepo := a.adapter.VerificationRepository()
+	userRepo := a.repositories.UserRepo
+	accountRepo := a.repositories.AccountRepo
+	verificationRepo := a.repositories.VerificationRepo
 
 	// Wrap session repository with caching if secondary storage is available
 	var sessionRepo session.Repository
-	sessionRepo = a.adapter.SessionRepository()
+	sessionRepo = a.repositories.SessionRepo
 	if a.config.SecondaryStorage != nil {
 		sessionRepo = cached.NewSessionRepository(sessionRepo, a.config.SecondaryStorage)
 	}
@@ -306,7 +302,7 @@ func (a *Auth) authService() *auth.Service {
 // composeWithOAuth wraps the base handler with OAuth routing capability
 // It creates a composite handler that delegates to either the base auth handler or OAuth handler
 // based on the request path
-func (a *Auth) composeWithOAuth(baseHandler http.Handler, oauthHandler *handler.OAuthHandler) http.Handler {
+func (auth *Auth) composeWithOAuth(baseHandler http.Handler, oauthHandler *handler.OAuthHandler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 
@@ -325,26 +321,26 @@ func (a *Auth) composeWithOAuth(baseHandler http.Handler, oauthHandler *handler.
 // AuthMiddleware returns a ready-to-use authentication middleware
 // It validates session tokens and extracts user IDs from requests
 // The middleware requires valid authentication (returns 401 if missing or invalid)
-func (a *Auth) AuthMiddleware() *middleware.AuthMiddleware {
-	return middleware.NewAuthMiddleware(a.authService())
+func (auth *Auth) AuthMiddleware() *middleware.AuthMiddleware {
+	return middleware.NewAuthMiddleware(auth.authService())
 }
 
 // AuthMiddlewareWithCookie returns a ready-to-use authentication middleware with a custom cookie name
 // It validates session tokens and extracts user IDs from requests
 // The middleware requires valid authentication (returns 401 if missing or invalid)
-func (a *Auth) AuthMiddlewareWithCookie(cookieName string) *middleware.AuthMiddleware {
-	return middleware.NewAuthMiddlewareWithCookie(a.authService(), cookieName)
+func (auth *Auth) AuthMiddlewareWithCookie(cookieName string) *middleware.AuthMiddleware {
+	return middleware.NewAuthMiddlewareWithCookie(auth.authService(), cookieName)
 }
 
 // OptionalAuthMiddleware returns a ready-to-use optional authentication middleware
 // It validates session tokens if present, but doesn't require them
 // Requests without tokens or with invalid tokens are still allowed
-func (a *Auth) OptionalAuthMiddleware() *middleware.OptionalAuthMiddleware {
-	return middleware.NewOptionalAuthMiddleware(a.authService())
+func (auth *Auth) OptionalAuthMiddleware() *middleware.OptionalAuthMiddleware {
+	return middleware.NewOptionalAuthMiddleware(auth.authService())
 }
 
 // OptionalAuthMiddlewareWithCookie returns a ready-to-use optional authentication middleware with a custom cookie name
 // It validates session tokens if present, but doesn't require them
-func (a *Auth) OptionalAuthMiddlewareWithCookie(cookieName string) *middleware.OptionalAuthMiddleware {
-	return middleware.NewOptionalAuthMiddlewareWithCookie(a.authService(), cookieName)
+func (auth *Auth) OptionalAuthMiddlewareWithCookie(cookieName string) *middleware.OptionalAuthMiddleware {
+	return middleware.NewOptionalAuthMiddlewareWithCookie(auth.authService(), cookieName)
 }
