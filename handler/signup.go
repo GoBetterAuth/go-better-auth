@@ -28,6 +28,15 @@ func (h *AuthHandler) SignUpHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	existingSession, existingUser, err := h.checkExistingSession(r)
+	if err == nil && existingSession != nil && existingUser != nil {
+		SuccessResponse(w, http.StatusOK, &SignUpResponse{
+			Token: existingSession.Token,
+			User:  existingUser,
+		})
+		return
+	}
+
 	var req SignUpRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		ErrorResponse(w, http.StatusBadRequest, "invalid request body")

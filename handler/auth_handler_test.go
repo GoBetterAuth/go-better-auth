@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -581,4 +582,169 @@ func TestVerifyEmailGetHandler_CustomRedirectURL(t *testing.T) {
 	if query.Get("type") != string(verification.TypeEmailVerification) {
 		t.Fatalf("Expected type query param to be appended, got %s", query.Get("type"))
 	}
+}
+
+func TestSignInHandler_ReuseExistingSession(t *testing.T) {
+	handler := setupTestHandler(t)
+
+	// First, create a user and sign them in to get a session
+	signUpReq := SignUpRequest{
+		Email:    "reuse@example.com",
+		Password: "ValidPassword123!",
+		Name:     "Reuse Test User",
+	}
+
+	signUpBody, _ := json.Marshal(signUpReq)
+	req := httptest.NewRequest(http.MethodPost, "/auth/sign-up/email", bytes.NewReader(signUpBody))
+	w := httptest.NewRecorder()
+
+	handler.SignUpHandler(w, req)
+	require.Equal(t, http.StatusCreated, w.Code)
+
+	bodyStr := w.Body.String()
+	t.Logf("Response body: %s", bodyStr)
+
+	// Need to re-create the reader since we read it above
+	var envelope Response
+	err := json.NewDecoder(strings.NewReader(bodyStr)).Decode(&envelope)
+	require.NoError(t, err)
+	require.True(t, envelope.Success)
+
+	// Now decode the data part as SignUpResponse
+	dataBytes, err := json.Marshal(envelope.Data)
+	require.NoError(t, err)
+
+	var signUpResponse SignUpResponse
+	err = json.Unmarshal(dataBytes, &signUpResponse)
+	require.NoError(t, err)
+
+	originalToken := signUpResponse.Token
+
+	// Extract the session cookie set by the signup
+	cookies := w.Result().Cookies()
+	expectedCookieName := handler.cookieManager.GetSessionCookieName()
+
+	var sessionCookie *http.Cookie
+	for _, cookie := range cookies {
+		if cookie.Name == expectedCookieName {
+			sessionCookie = cookie
+			break
+		}
+	}
+
+	require.NotNil(t, sessionCookie, "Session cookie should be set")
+	require.Equal(t, originalToken, sessionCookie.Value)
+
+	// Now try to sign in with the same user, but include the existing session cookie
+	signInReq := SignInRequest{
+		Email:    "reuse@example.com",
+		Password: "ValidPassword123!",
+	}
+
+	signInBody, _ := json.Marshal(signInReq)
+	req2 := httptest.NewRequest(http.MethodPost, "/auth/sign-in/email", bytes.NewReader(signInBody))
+	req2.AddCookie(sessionCookie) // Add the existing session cookie
+	w2 := httptest.NewRecorder()
+
+	handler.SignInHandler(w2, req2)
+	require.Equal(t, http.StatusOK, w2.Code)
+
+	signInBodyStr := w2.Body.String()
+
+	var signInEnvelope Response
+	err = json.NewDecoder(strings.NewReader(signInBodyStr)).Decode(&signInEnvelope)
+	require.NoError(t, err)
+	require.True(t, signInEnvelope.Success)
+
+	signInDataBytes, err := json.Marshal(signInEnvelope.Data)
+	require.NoError(t, err)
+
+	var signInResponse SignInResponse
+	err = json.Unmarshal(signInDataBytes, &signInResponse)
+	require.NoError(t, err)
+
+	// Verify that the same token is returned (session was reused)
+	require.Equal(t, originalToken, signInResponse.Token)
+	require.Equal(t, signUpResponse.User.ID, signInResponse.User.ID)
+	require.Equal(t, signUpResponse.User.Email, signInResponse.User.Email)
+}
+
+func TestSignUpHandler_ReuseExistingSession(t *testing.T) {
+	handler := setupTestHandler(t)
+
+	// First, create a user and sign them in to get a session
+	signUpReq := SignUpRequest{
+		Email:    "reusesignup@example.com",
+		Password: "ValidPassword123!",
+		Name:     "Reuse Signup Test User",
+	}
+
+	signUpBody, _ := json.Marshal(signUpReq)
+	req := httptest.NewRequest(http.MethodPost, "/auth/sign-up/email", bytes.NewReader(signUpBody))
+	w := httptest.NewRecorder()
+
+	handler.SignUpHandler(w, req)
+	require.Equal(t, http.StatusCreated, w.Code)
+
+	bodyStr := w.Body.String()
+
+	var envelope Response
+	err := json.NewDecoder(strings.NewReader(bodyStr)).Decode(&envelope)
+	require.NoError(t, err)
+	require.True(t, envelope.Success)
+
+	dataBytes, err := json.Marshal(envelope.Data)
+	require.NoError(t, err)
+
+	var signUpResponse SignUpResponse
+	err = json.Unmarshal(dataBytes, &signUpResponse)
+	require.NoError(t, err)
+
+	originalToken := signUpResponse.Token
+
+	// Extract the session cookie set by the signup
+	cookies := w.Result().Cookies()
+	var sessionCookie *http.Cookie
+	for _, cookie := range cookies {
+		if cookie.Name == handler.cookieManager.GetSessionCookieName() {
+			sessionCookie = cookie
+			break
+		}
+	}
+	require.NotNil(t, sessionCookie, "Session cookie should be set")
+
+	// Try to sign up again with different details but include the existing session cookie
+	// This should return the existing session instead of creating a new user
+	signUp2Req := SignUpRequest{
+		Email:    "different@example.com",
+		Password: "DifferentPassword123!",
+		Name:     "Different User",
+	}
+
+	signUp2Body, _ := json.Marshal(signUp2Req)
+	req2 := httptest.NewRequest(http.MethodPost, "/auth/sign-up/email", bytes.NewReader(signUp2Body))
+	req2.AddCookie(sessionCookie) // Add the existing session cookie
+	w2 := httptest.NewRecorder()
+
+	handler.SignUpHandler(w2, req2)
+	require.Equal(t, http.StatusOK, w2.Code) // Should be 200 (existing session) not 201 (created)
+
+	signUp2BodyStr := w2.Body.String()
+
+	var signUp2Envelope Response
+	err = json.NewDecoder(strings.NewReader(signUp2BodyStr)).Decode(&signUp2Envelope)
+	require.NoError(t, err)
+	require.True(t, signUp2Envelope.Success)
+
+	signUp2DataBytes, err := json.Marshal(signUp2Envelope.Data)
+	require.NoError(t, err)
+
+	var signUp2Response SignUpResponse
+	err = json.Unmarshal(signUp2DataBytes, &signUp2Response)
+	require.NoError(t, err)
+
+	// Verify that the same session is returned (not a new user)
+	require.Equal(t, originalToken, signUp2Response.Token)
+	require.Equal(t, signUpResponse.User.ID, signUp2Response.User.ID)
+	require.Equal(t, signUpResponse.User.Email, signUp2Response.User.Email) // Should be original email, not the new one
 }

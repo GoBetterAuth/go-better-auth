@@ -27,6 +27,15 @@ func (h *AuthHandler) SignInHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	existingSession, existingUser, err := h.checkExistingSession(r)
+	if err == nil && existingSession != nil && existingUser != nil {
+		SuccessResponse(w, http.StatusOK, &SignInResponse{
+			Token: existingSession.Token,
+			User:  existingUser,
+		})
+		return
+	}
+
 	var req SignInRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		ErrorResponse(w, http.StatusBadRequest, "invalid request body")
@@ -36,7 +45,6 @@ func (h *AuthHandler) SignInHandler(w http.ResponseWriter, r *http.Request) {
 	ipAddress := r.RemoteAddr
 	userAgent := r.Header.Get("User-Agent")
 
-	// Call use
 	resp, err := h.service.SignIn(r.Context(), &auth.SignInRequest{
 		Email:       req.Email,
 		Password:    req.Password,
