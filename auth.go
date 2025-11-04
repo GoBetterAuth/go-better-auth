@@ -33,6 +33,7 @@ type Auth struct {
 	passwordHasher  *crypto.Argon2PasswordHasher
 	cipherManager   *crypto.CipherManager
 	repositories    *gormrepo.Repositories
+	cookieManager   *handler.CookieManager
 }
 
 // New creates a new instance of the authentication system
@@ -66,6 +67,9 @@ func New(config *domain.Config) (*Auth, error) {
 		return nil, fmt.Errorf("failed to create repositories: %w", err)
 	}
 
+	// Create cookie manager
+	cookieManager := handler.NewCookieManager(config)
+
 	// Create the auth instance
 	auth := &Auth{
 		config:          config,
@@ -73,6 +77,7 @@ func New(config *domain.Config) (*Auth, error) {
 		passwordHasher:  crypto.NewArgon2PasswordHasher(),
 		cipherManager:   cipherManager,
 		repositories:    repositories,
+		cookieManager:   cookieManager,
 	}
 
 	return auth, nil
@@ -167,8 +172,10 @@ func (a *Auth) Handler() http.Handler {
 		service.SetBruteForceService(bruteForceService)
 	}
 
+	cookieManager := handler.NewCookieManager(a.config)
+
 	// Create the base auth handler
-	baseHandler := handler.NewAuthHandler(service)
+	baseHandler := handler.NewAuthHandler(service, cookieManager)
 
 	// Initialize OAuth if social providers are configured
 	var oauthHandler *handler.OAuthHandler
@@ -322,25 +329,12 @@ func (auth *Auth) composeWithOAuth(baseHandler http.Handler, oauthHandler *handl
 // It validates session tokens and extracts user IDs from requests
 // The middleware requires valid authentication (returns 401 if missing or invalid)
 func (auth *Auth) AuthMiddleware() *middleware.AuthMiddleware {
-	return middleware.NewAuthMiddleware(auth.authService())
-}
-
-// AuthMiddlewareWithCookie returns a ready-to-use authentication middleware with a custom cookie name
-// It validates session tokens and extracts user IDs from requests
-// The middleware requires valid authentication (returns 401 if missing or invalid)
-func (auth *Auth) AuthMiddlewareWithCookie(cookieName string) *middleware.AuthMiddleware {
-	return middleware.NewAuthMiddlewareWithCookie(auth.authService(), cookieName)
+	return middleware.NewAuthMiddleware(auth.authService(), auth.cookieManager.GetSessionCookieName())
 }
 
 // OptionalAuthMiddleware returns a ready-to-use optional authentication middleware
 // It validates session tokens if present, but doesn't require them
 // Requests without tokens or with invalid tokens are still allowed
 func (auth *Auth) OptionalAuthMiddleware() *middleware.OptionalAuthMiddleware {
-	return middleware.NewOptionalAuthMiddleware(auth.authService())
-}
-
-// OptionalAuthMiddlewareWithCookie returns a ready-to-use optional authentication middleware with a custom cookie name
-// It validates session tokens if present, but doesn't require them
-func (auth *Auth) OptionalAuthMiddlewareWithCookie(cookieName string) *middleware.OptionalAuthMiddleware {
-	return middleware.NewOptionalAuthMiddlewareWithCookie(auth.authService(), cookieName)
+	return middleware.NewOptionalAuthMiddleware(auth.authService(), auth.cookieManager.GetSessionCookieName())
 }

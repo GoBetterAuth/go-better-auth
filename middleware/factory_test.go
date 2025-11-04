@@ -13,6 +13,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	factoryTestsCookieName = "test_session_token"
+)
+
 func setupTestService(t *testing.T) *auth.Service {
 	t.Helper()
 
@@ -33,18 +37,18 @@ func TestNewAuthMiddlewareFactory(t *testing.T) {
 	logger := slog.Default()
 	service := setupTestService(t)
 
-	factory := NewAuthMiddlewareFactory(service, logger)
+	factory := NewAuthMiddlewareFactory(service, factoryTestsCookieName, logger)
 
 	assert.NotNil(t, factory)
 	assert.Equal(t, service, factory.service)
-	assert.Equal(t, "session_token", factory.cookieName)
+	assert.Equal(t, factoryTestsCookieName, factory.cookieName)
 	assert.NotNil(t, factory.logger)
 }
 
 func TestNewAuthMiddlewareFactory_NilLogger(t *testing.T) {
 	service := setupTestService(t)
 
-	factory := NewAuthMiddlewareFactory(service, nil)
+	factory := NewAuthMiddlewareFactory(service, factoryTestsCookieName, nil)
 
 	assert.NotNil(t, factory)
 	assert.NotNil(t, factory.logger)
@@ -53,7 +57,7 @@ func TestNewAuthMiddlewareFactory_NilLogger(t *testing.T) {
 func TestAuthMiddlewareFactory_AuthHandler_Returns(t *testing.T) {
 	logger := slog.Default()
 	service := setupTestService(t)
-	factory := NewAuthMiddlewareFactory(service, logger)
+	factory := NewAuthMiddlewareFactory(service, factoryTestsCookieName, logger)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -66,7 +70,7 @@ func TestAuthMiddlewareFactory_AuthHandler_Returns(t *testing.T) {
 func TestAuthMiddlewareFactory_AuthHandlerFunc_Returns(t *testing.T) {
 	logger := slog.Default()
 	service := setupTestService(t)
-	factory := NewAuthMiddlewareFactory(service, logger)
+	factory := NewAuthMiddlewareFactory(service, factoryTestsCookieName, logger)
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -79,7 +83,7 @@ func TestAuthMiddlewareFactory_AuthHandlerFunc_Returns(t *testing.T) {
 func TestAuthMiddlewareFactory_OptionalAuthHandler_Returns(t *testing.T) {
 	logger := slog.Default()
 	service := setupTestService(t)
-	factory := NewAuthMiddlewareFactory(service, logger)
+	factory := NewAuthMiddlewareFactory(service, factoryTestsCookieName, logger)
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -92,7 +96,7 @@ func TestAuthMiddlewareFactory_OptionalAuthHandler_Returns(t *testing.T) {
 func TestAuthMiddlewareFactory_OptionalAuthHandlerFunc_Returns(t *testing.T) {
 	logger := slog.Default()
 	service := setupTestService(t)
-	factory := NewAuthMiddlewareFactory(service, logger)
+	factory := NewAuthMiddlewareFactory(service, factoryTestsCookieName, logger)
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -102,34 +106,10 @@ func TestAuthMiddlewareFactory_OptionalAuthHandlerFunc_Returns(t *testing.T) {
 	assert.NotNil(t, middleware)
 }
 
-func TestAuthMiddlewareFactory_WithCookieName(t *testing.T) {
-	logger := slog.Default()
-	service := setupTestService(t)
-	factory := NewAuthMiddlewareFactory(service, logger)
-
-	assert.Equal(t, "session_token", factory.cookieName)
-
-	updatedFactory := factory.WithCookieName("custom_cookie")
-
-	assert.Equal(t, "custom_cookie", updatedFactory.cookieName)
-	assert.Equal(t, factory, updatedFactory)
-}
-
-func TestAuthMiddlewareFactory_Chaining(t *testing.T) {
-	logger := slog.Default()
-	service := setupTestService(t)
-	factory := NewAuthMiddlewareFactory(service, logger)
-
-	result := factory.WithCookieName("auth").WithCookieName("session")
-
-	assert.NotNil(t, result)
-	assert.Equal(t, "session", factory.cookieName)
-}
-
 func TestAuthMiddlewareFactory_MultipleHandlers(t *testing.T) {
 	logger := slog.Default()
 	service := setupTestService(t)
-	factory := NewAuthMiddlewareFactory(service, logger)
+	factory := NewAuthMiddlewareFactory(service, factoryTestsCookieName, logger)
 
 	handler1 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -161,7 +141,7 @@ func TestAuthMiddlewareFactory_MultipleHandlers(t *testing.T) {
 func TestAuthMiddlewareFactory_Integration_WithMux(t *testing.T) {
 	logger := slog.Default()
 	service := setupTestService(t)
-	factory := NewAuthMiddlewareFactory(service, logger)
+	factory := NewAuthMiddlewareFactory(service, factoryTestsCookieName, logger)
 
 	mux := http.NewServeMux()
 
@@ -195,7 +175,7 @@ func TestAuthMiddlewareFactory_Integration_WithMux(t *testing.T) {
 func TestAuthMiddlewareFactory_ContextUtilities(t *testing.T) {
 	logger := slog.Default()
 	service := setupTestService(t)
-	factory := NewAuthMiddlewareFactory(service, logger)
+	factory := NewAuthMiddlewareFactory(service, factoryTestsCookieName, logger)
 
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		userID, err := GetUserID(r.Context())
@@ -223,7 +203,7 @@ func TestAuthMiddlewareFactory_ContextUtilities(t *testing.T) {
 func TestAuthMiddlewareFactory_WithValidSession(t *testing.T) {
 	logger := slog.Default()
 	service := setupTestService(t)
-	factory := NewAuthMiddlewareFactory(service, logger)
+	factory := NewAuthMiddlewareFactory(service, factoryTestsCookieName, logger)
 
 	// Create a user and sign in to get a session
 	signupResp, err := service.SignUp(context.Background(), &auth.SignUpRequest{

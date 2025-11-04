@@ -16,6 +16,10 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/usecase/auth"
 )
 
+const (
+	authTestsCookieName = "test_session_token"
+)
+
 // setupTestRepositories creates GORM repositories with SQLite in-memory database for testing
 func setupTestRepositories(t *testing.T) *gorm.Repositories {
 	t.Helper()
@@ -137,7 +141,7 @@ func TestAuthMiddleware_ValidBearerToken(t *testing.T) {
 	token := signinResp.Session.Token
 
 	// Create middleware and protected handler
-	middleware := NewAuthMiddleware(service)
+	middleware := NewAuthMiddleware(service, authTestsCookieName)
 	protectedHandler := middleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		userID, err := GetUserID(r.Context())
 		assert.NoError(t, err)
@@ -167,7 +171,7 @@ func TestAuthMiddleware_MissingToken(t *testing.T) {
 		repos.VerificationRepo,
 	)
 
-	middleware := NewAuthMiddleware(service)
+	middleware := NewAuthMiddleware(service, authTestsCookieName)
 	protectedHandler := middleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -192,7 +196,7 @@ func TestAuthMiddleware_InvalidToken(t *testing.T) {
 		repos.VerificationRepo,
 	)
 
-	middleware := NewAuthMiddleware(service)
+	middleware := NewAuthMiddleware(service, authTestsCookieName)
 	protectedHandler := middleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -218,7 +222,7 @@ func TestAuthMiddleware_InvalidBearerFormat(t *testing.T) {
 		repos.VerificationRepo,
 	)
 
-	middleware := NewAuthMiddleware(service)
+	middleware := NewAuthMiddleware(service, authTestsCookieName)
 	protectedHandler := middleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -262,7 +266,7 @@ func TestAuthMiddleware_CookieToken(t *testing.T) {
 	token := signinResp.Session.Token
 
 	// Create middleware with custom cookie name
-	middleware := NewAuthMiddlewareWithCookie(service, "auth_token")
+	middleware := NewAuthMiddleware(service, authTestsCookieName)
 	protectedHandler := middleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		userID, err := GetUserID(r.Context())
 		assert.NoError(t, err)
@@ -273,7 +277,7 @@ func TestAuthMiddleware_CookieToken(t *testing.T) {
 	// Create request with cookie
 	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
 	req.AddCookie(&http.Cookie{
-		Name:  "auth_token",
+		Name:  authTestsCookieName,
 		Value: token,
 	})
 
@@ -313,7 +317,7 @@ func TestAuthMiddleware_HandlerFunc(t *testing.T) {
 	token := signinResp.Session.Token
 
 	// Create middleware
-	middleware := NewAuthMiddleware(service)
+	middleware := NewAuthMiddleware(service, authTestsCookieName)
 
 	// Create handler with HandlerFunc
 	var capturedUserID string
@@ -366,7 +370,7 @@ func TestOptionalAuthMiddleware_ValidToken(t *testing.T) {
 	token := signinResp.Session.Token
 
 	// Create optional middleware
-	middleware := NewOptionalAuthMiddleware(service)
+	middleware := NewOptionalAuthMiddleware(service, authTestsCookieName)
 	protectedHandler := middleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		userID, err := GetUserID(r.Context())
 		assert.NoError(t, err)
@@ -395,7 +399,7 @@ func TestOptionalAuthMiddleware_NoToken(t *testing.T) {
 		repos.VerificationRepo,
 	)
 
-	middleware := NewOptionalAuthMiddleware(service)
+	middleware := NewOptionalAuthMiddleware(service, authTestsCookieName)
 	protectedHandler := middleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Should be able to check if user ID exists without error
 		_, err := GetUserID(r.Context())
@@ -423,7 +427,7 @@ func TestOptionalAuthMiddleware_InvalidToken(t *testing.T) {
 		repos.VerificationRepo,
 	)
 
-	middleware := NewOptionalAuthMiddleware(service)
+	middleware := NewOptionalAuthMiddleware(service, authTestsCookieName)
 	protectedHandler := middleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Should still be able to access without error
 		w.WriteHeader(http.StatusOK)
@@ -470,7 +474,7 @@ func TestAuthMiddleware_SetSessionTokenInContext(t *testing.T) {
 	token := signinResp.Session.Token
 
 	// Create middleware
-	middleware := NewAuthMiddleware(service)
+	middleware := NewAuthMiddleware(service, authTestsCookieName)
 	var capturedToken string
 	protectedHandler := middleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sessionToken, err := GetSessionToken(r.Context())
@@ -526,7 +530,7 @@ func TestAuthMiddleware_ExpiredSession(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create middleware
-	middleware := NewAuthMiddleware(service)
+	middleware := NewAuthMiddleware(service, authTestsCookieName)
 	protectedHandler := middleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))

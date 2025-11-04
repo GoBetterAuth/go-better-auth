@@ -10,7 +10,7 @@ import (
 // AuthMiddleware validates the session token and extracts the user ID from the request
 // It expects the token in either:
 // 1. Authorization header (Bearer <token>)
-// 2. Cookie named "session_token" or custom cookie name
+// 2. Cookie with a configured name
 //
 // On successful validation, it sets UserID and SessionToken in the request context
 // If validation fails, it returns a 401 Unauthorized response
@@ -19,16 +19,8 @@ type AuthMiddleware struct {
 	cookieName string
 }
 
-// NewAuthMiddleware creates a new auth middleware with default settings
-func NewAuthMiddleware(service *auth.Service) *AuthMiddleware {
-	return &AuthMiddleware{
-		service:    service,
-		cookieName: "session_token",
-	}
-}
-
-// NewAuthMiddlewareWithCookie creates a new auth middleware with a custom cookie name
-func NewAuthMiddlewareWithCookie(service *auth.Service, cookieName string) *AuthMiddleware {
+// NewAuthMiddleware creates a new auth middleware.
+func NewAuthMiddleware(service *auth.Service, cookieName string) *AuthMiddleware {
 	return &AuthMiddleware{
 		service:    service,
 		cookieName: cookieName,
@@ -96,16 +88,8 @@ type OptionalAuthMiddleware struct {
 	cookieName string
 }
 
-// NewOptionalAuthMiddleware creates a new optional auth middleware with default settings
-func NewOptionalAuthMiddleware(service *auth.Service) *OptionalAuthMiddleware {
-	return &OptionalAuthMiddleware{
-		service:    service,
-		cookieName: "session_token",
-	}
-}
-
-// NewOptionalAuthMiddlewareWithCookie creates a new optional auth middleware with a custom cookie name
-func NewOptionalAuthMiddlewareWithCookie(service *auth.Service, cookieName string) *OptionalAuthMiddleware {
+// NewOptionalAuthMiddleware creates a new optional auth middleware.
+func NewOptionalAuthMiddleware(service *auth.Service, cookieName string) *OptionalAuthMiddleware {
 	return &OptionalAuthMiddleware{
 		service:    service,
 		cookieName: cookieName,
