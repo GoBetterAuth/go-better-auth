@@ -63,7 +63,7 @@ For more info and a full guide on how to use this library, check out the [Docs](
 Your contributions are welcome! Here's how you can get involved:
 
 - If you find a bug, please [submit an issue](https://github.com/GoBetterAuth/go-better-auth/issues).
-- Set up your development environment by following our [Contribution Guide](./contribution-guide.md).
+- Set up your development environment by following our [Contribution Guide](./.github/CONTRIBUTING.md).
 - Contribute code by making a [pull request](https://github.com/GoBetterAuth/go-better-auth/) to enhance features, improve user experience, or fix issues.
 
 ---

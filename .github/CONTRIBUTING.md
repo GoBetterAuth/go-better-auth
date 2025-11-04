@@ -39,21 +39,17 @@ Please be aware that duplicate issues might already exist. If you are creating a
 
 To start contributing:
 
+- Install Go: https://go.dev/doc/install
+
 - [Fork](https://docs.github.com/en/github/getting-started-with-github/fork-a-repo) the repository
+
 - Clone the fork on your workstation:
 
-```bash
-$ git clone git@github.com:{YOUR_USERNAME}/go-better-auth.git
+  ```bash
+  $ git clone git@github.com:{YOUR_USERNAME}/go-better-auth.git
 
-$ cd go-better-auth
-```
-
-Once you have this repo cloned to your local system, you will need to install the VSCode extension [Remote Development](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.vscode-remote-extensionpack).
-
-Then run the following command from the command palette:
-`Dev Containers: Open Folder in Container...`
-
-This will automatically select the workspace folder. But if you need to find the project manually then it is located at `/workspaces/go-better-auth`.
+  $ cd go-better-auth
+  ```
 
 #### Development:
 
@@ -67,8 +63,8 @@ This will automatically select the workspace folder. But if you need to find the
   - `domain/` – core models and interfaces
   - `usecase/` – business logic
   - `repository/` – data access implementations
-  - `handler/` – HTTP/gRPC handlers
-  - `infrastructure/` – external integrations
+  - `handler/` – HTTP handlers
+  - `infrastructure/` – configurations and tooling
 
 3. **Testing**
 
@@ -86,11 +82,11 @@ This will automatically select the workspace folder. But if you need to find the
 
 - Follow the project’s folder structure.
 - Write tests for new features.
-- Ensure all code passes linting and tests before submitting a PR.
+- Ensure all code passes tests before submitting a PR.
 
 5. **Submitting a PR**
 
 - Push your branch and open a pull request.
-- Fill out the PR template and link related issues.
+- Fill out the PR and link related issues.
 
 ---
