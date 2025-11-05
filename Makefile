@@ -20,7 +20,7 @@ build: ## Build the package (library)
 
 build-cli: ## Build CLI tool
 	@echo "Building CLI tool..."
-	@[ -f cmd/cli/main.go ] && go build -o $(BINARY_PATH)-cli ./cmd/cli || echo "No cmd/cli/main.go found"
+	@[ -f cmd/cli/main.go ] && CGO_ENABLED=1 go build -o $(BINARY_PATH)-cli ./cmd/cli || echo "No cmd/cli/main.go found"
 
 # Run commands
 run: ## Run example (if cmd/main.go exists)
