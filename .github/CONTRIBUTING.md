@@ -39,10 +39,7 @@ Please be aware that duplicate issues might already exist. If you are creating a
 
 To start contributing:
 
-- Install Go: https://go.dev/doc/install
-
 - [Fork](https://docs.github.com/en/github/getting-started-with-github/fork-a-repo) the repository
-
 - Clone the fork on your workstation:
 
   ```bash
@@ -51,15 +48,32 @@ To start contributing:
   $ cd go-better-auth
   ```
 
+Choose one of the following development setups:
+
+1. `Devcontainers`:
+
+Once you have this repo cloned to your local system, you will need to install the VSCode extension [Remote Development](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.vscode-remote-extensionpack).
+
+Then run the following command from the command palette:
+`Dev Containers: Open Folder in Container...`
+
+This will automatically select the workspace folder. But if you need to find the project manually then it is located at `/workspaces/go-better-auth`. You can then proceed to the development section below.
+
+2. `Without devcontainers`:
+
+- Make sure to install [Go](https://go.dev/doc/install) and set it up as shown in their docs.
+
 #### Development:
 
 1. **Install Dependencies**
 
-- Run `go mod download && go mod tidy` to install Go dependencies.
+- Once you have your environment set up and you are within the project, run `go mod download && go mod tidy` to install Go dependencies.
+
+- Then as a test run `make build` to ensure the project builds successfully, this could take a few seconds to a minute.
 
 2. **Project Structure**
 
-- Code is organized by Go Clean Architecture:
+- Code is organised by Go Clean Architecture:
   - `domain/` – core models and interfaces
   - `usecase/` – business logic
   - `repository/` – data access implementations
