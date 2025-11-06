@@ -13,8 +13,8 @@ import (
 
 // SendEmailVerificationRequest contains the request data for sending an email verification
 type SendEmailVerificationRequest struct {
-	Email       string `json:"email"`
-	CallbackURL string `json:"callback_url,omitempty"`
+	Email       string  `json:"email"`
+	CallbackURL *string `json:"callback_url,omitempty"`
 }
 
 // SendEmailVerificationResponse contains the response data for sending email verification
@@ -74,7 +74,7 @@ func (s *Service) SendEmailVerification(ctx context.Context, req *SendEmailVerif
 }
 
 // sendVerificationEmailForRequestAsync sends a verification email asynchronously for manual verification requests
-func (s *Service) sendVerificationEmailForRequestAsync(ctx context.Context, user *user.User, verificationToken string, callbackURL string) {
+func (s *Service) sendVerificationEmailForRequestAsync(ctx context.Context, user *user.User, verificationToken string, callbackURL *string) {
 	verifyURL := s.buildVerificationURL(verificationToken, callbackURL)
 
 	// Send email

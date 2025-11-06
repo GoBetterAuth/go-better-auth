@@ -8,8 +8,8 @@ import (
 )
 
 type RequestPasswordResetRequest struct {
-	Email       string `json:"email"`
-	CallbackURL string `json:"callback_url,omitempty"`
+	Email       string  `json:"email"`
+	CallbackURL *string `json:"callback_url,omitempty"`
 }
 
 type RequestPasswordResetResponse struct {

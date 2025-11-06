@@ -37,15 +37,15 @@ func (h *OAuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	method := r.Method
 
 	// Extract the endpoint from the path
-	// Paths: /auth/oauth/{provider}, /auth/oauth/{provider}/callback, /auth/oauth/accounts
+	// Paths: /auth/{provider}, /auth/{provider}/callback, /auth/accounts
 	parts := strings.Split(strings.Trim(path, "/"), "/")
 
-	if len(parts) < 3 {
+	if len(parts) < 2 {
 		ErrorResponse(w, http.StatusBadRequest, "Invalid OAuth path")
 		return
 	}
 
-	endpoint := parts[3] // "oauth" is at index 2, provider at index 3
+	endpoint := parts[2]
 
 	switch method {
 	case "GET":
@@ -55,11 +55,11 @@ func (h *OAuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		} else if endpoint == "accounts" {
 			h.HandleOAuthLinkedAccounts(w, r)
 		} else {
-			// Start OAuth flow: /auth/oauth/{provider}
+			// Start OAuth flow: /auth/{provider}
 			h.HandleOAuthAuthorize(w, r)
 		}
 	case "DELETE":
-		// Unlink OAuth account: DELETE /auth/oauth/{provider}
+		// Unlink OAuth account: DELETE /auth/{provider}
 		h.HandleOAuthUnlink(w, r)
 	default:
 		ErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -82,17 +82,17 @@ type OAuthCallbackRequest struct {
 }
 
 // HandleOAuthAuthorize initiates the OAuth authorization flow
-// GET /auth/oauth/{provider}
+// GET /auth/{provider}
 func (h *OAuthHandler) HandleOAuthAuthorize(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Extract provider from URL path
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(parts) < 3 {
+	if len(parts) < 2 {
 		ErrorResponse(w, http.StatusBadRequest, "provider not specified")
 		return
 	}
-	providerID := account.ProviderType(parts[2])
+	providerID := account.ProviderType(parts[1])
 
 	// Get provider from registry
 	provider, err := h.providerReg.Get(providerID)
@@ -137,17 +137,17 @@ func (h *OAuthHandler) HandleOAuthAuthorize(w http.ResponseWriter, r *http.Reque
 }
 
 // HandleOAuthCallback handles the OAuth callback from the provider
-// GET /auth/oauth/{provider}/callback
+// GET /auth/{provider}/callback
 func (h *OAuthHandler) HandleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Extract provider from URL path
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(parts) < 3 {
+	if len(parts) < 2 {
 		ErrorResponse(w, http.StatusBadRequest, "provider not specified")
 		return
 	}
-	providerID := account.ProviderType(parts[2])
+	providerID := account.ProviderType(parts[1])
 
 	// Check for OAuth error response
 	if errMsg := r.URL.Query().Get("error"); errMsg != "" {
@@ -272,7 +272,7 @@ func (h *OAuthHandler) HandleOAuthCallback(w http.ResponseWriter, r *http.Reques
 }
 
 // HandleOAuthUnlink unlinks an OAuth account from the user
-// DELETE /auth/oauth/{provider}
+// DELETE /auth/{provider}
 func (h *OAuthHandler) HandleOAuthUnlink(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -285,11 +285,11 @@ func (h *OAuthHandler) HandleOAuthUnlink(w http.ResponseWriter, r *http.Request)
 
 	// Extract provider from URL path
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(parts) < 3 {
+	if len(parts) < 2 {
 		ErrorResponse(w, http.StatusBadRequest, "provider not specified")
 		return
 	}
-	providerID := account.ProviderType(parts[2])
+	providerID := account.ProviderType(parts[1])
 
 	// Unlink the account
 	req := &auth.UnlinkOAuthAccountRequest{
@@ -316,7 +316,7 @@ func (h *OAuthHandler) HandleOAuthUnlink(w http.ResponseWriter, r *http.Request)
 }
 
 // HandleOAuthLinkedAccounts returns all OAuth accounts linked to the user
-// GET /auth/oauth/accounts
+// GET /auth/accounts
 func (h *OAuthHandler) HandleOAuthLinkedAccounts(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -337,7 +337,7 @@ func (h *OAuthHandler) HandleOAuthLinkedAccounts(w http.ResponseWriter, r *http.
 		return
 	}
 
-	SuccessResponse(w, http.StatusOK, map[string]interface{}{
+	SuccessResponse(w, http.StatusOK, map[string]any{
 		"accounts": accounts,
 	})
 }

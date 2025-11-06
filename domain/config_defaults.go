@@ -11,18 +11,21 @@ import (
 // Default configuration values
 const (
 	DefaultBasePath              = "/api/auth"
-	DefaultSessionExpiresIn      = 604800 // 7 days
-	DefaultSessionUpdateAge      = 86400  // 1 day
 	DefaultMinPasswordLength     = 8
 	DefaultMaxPasswordLength     = 128
+	DefaultSessionExpiresIn      = 7 * 24 * time.Hour // 7 days
+	DefaultSessionUpdateAge      = 24 * time.Hour     // 1 day
 	DefaultVerificationExpiresIn = 1 * time.Hour
 	DefaultResetPasswordExpiry   = 1 * time.Hour
 	DefaultRateLimitWindow       = 10
 	DefaultRateLimitMax          = 100
-	DefaultCookieCacheMaxAge     = 300 // 5 minutes
+	DefaultCookieCacheMaxAge     = 5 * time.Minute
 	DefaultFindManyLimit         = 100
 	DefaultSecret                = "go-better-auth-secret-0123456789"
 )
+
+// Default time-based configuration values
+var ()
 
 // ApplyDefaults applies default values to a Config
 func (c *Config) ApplyDefaults() {

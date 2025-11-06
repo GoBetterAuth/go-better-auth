@@ -29,7 +29,7 @@ type Config struct {
 	TrustedOrigins TrustedOriginsConfig
 
 	// Secret is used for encryption, signing, and hashing
-	// If not set, will check GO_BETTER_AUTH_SECRET or AUTH_SECRET environment variables
+	// If not set, will check GO_BETTER_AUTH_SECRET environment variable
 	// In production, if not set, will throw an error
 	Secret string
 
@@ -228,36 +228,6 @@ type RedisConfig struct {
 	PoolSize int
 }
 
-// EmailVerificationConfig holds email verification configuration
-type EmailVerificationConfig struct {
-	// Enabled enables email verification feature (default: false)
-	Enabled bool
-
-	// SendVerificationEmail is a function to send verification emails
-	SendVerificationEmail func(ctx context.Context, user *user.User, url string, token string) error
-
-	// SendOnSignUp automatically sends verification email after sign up (default: false)
-	SendOnSignUp bool
-
-	// SendOnSignIn sends verification email on sign in when user's email is not verified (default: false)
-	SendOnSignIn bool
-
-	// AutoSignInAfterVerification automatically signs in the user after email verification
-	AutoSignInAfterVerification bool
-
-	// ExpiresIn is the duration the verification token is valid for (default: 1 hour)
-	ExpiresIn time.Duration
-}
-
-// PasswordConfig holds custom password hashing and verification
-type PasswordConfig struct {
-	// Hash is a custom password hashing function
-	Hash func(password string) (string, error)
-
-	// Verify is a custom password verification function
-	Verify func(password, hash string) bool
-}
-
 // EmailPasswordConfig holds email/password auth configuration
 type EmailPasswordConfig struct {
 	// Enabled enables email and password authentication (default: false)
@@ -288,32 +258,88 @@ type EmailPasswordConfig struct {
 	Password *PasswordConfig
 }
 
+// EmailVerificationConfig holds email verification configuration
+type EmailVerificationConfig struct {
+	// Enabled enables email verification feature (default: false)
+	Enabled bool
+
+	// SendVerificationEmail is a function to send verification emails
+	SendVerificationEmail func(ctx context.Context, user *user.User, url string, token string) error
+
+	// SendOnSignUp automatically sends verification email after sign up (default: false)
+	SendOnSignUp bool
+
+	// SendOnSignIn sends verification email on sign in when user's email is not verified (default: false)
+	SendOnSignIn bool
+
+	// AutoSignInAfterVerification automatically signs in the user after email verification
+	AutoSignInAfterVerification bool
+
+	// ExpiresIn is the duration the verification token is valid for (default: 1 hour)
+	ExpiresIn time.Duration
+}
+
+// PasswordConfig holds custom password hashing and verification
+type PasswordConfig struct {
+	// Hash is a custom password hashing function
+	Hash func(password string) (string, error)
+
+	// Verify is a custom password verification function
+	Verify func(password, hash string) bool
+}
+
 // SocialProvidersConfig holds social provider configuration
 type SocialProvidersConfig struct {
 	Google  *GoogleProviderConfig
 	GitHub  *GitHubProviderConfig
 	Discord *DiscordProviderConfig
+	// OAuthStateStorage configures how OAuth states are stored
+	OAuthStateStorage *OAuthStateStorageConfig
+}
+
+// SocialProviderOptions holds common options for social providers
+type SocialProviderOptions struct {
+	RedirectURI string
+	Scope       []string
 }
 
 // GoogleProviderConfig holds Google OAuth configuration
 type GoogleProviderConfig struct {
+	SocialProviderOptions
 	ClientID     string
 	ClientSecret string
-	RedirectURI  string
 }
 
 // GitHubProviderConfig holds GitHub OAuth configuration
 type GitHubProviderConfig struct {
+	SocialProviderOptions
 	ClientID     string
 	ClientSecret string
-	RedirectURI  string
 }
 
 // DiscordProviderConfig holds Discord OAuth configuration
 type DiscordProviderConfig struct {
+	SocialProviderOptions
 	ClientID     string
 	ClientSecret string
-	RedirectURI  string
+}
+
+// OAuthStateStorageConfig configures OAuth state storage for multi-instance deployments
+type OAuthStateStorageConfig struct {
+	// Type specifies the storage backend ("memory", "database", "secondary")
+	// - "memory": In-memory storage with automatic cleanup (default, not suitable for multi-instance)
+	// - "database": Database storage using GORM (suitable for multi-instance)
+	// - "secondary": Uses the configured SecondaryStorage (Redis, etc.)
+	Type string
+
+	// CleanupInterval specifies how often expired states are cleaned up (default: 5m)
+	CleanupInterval time.Duration
+
+	// TTL specifies how long OAuth states remain valid (default: 10m)
+	TTL time.Duration
+
+	// KeyPrefix is used for secondary storage to prefix OAuth state keys (default: "oauth_state:")
+	KeyPrefix string
 }
 
 // Plugin defines the interface for Go Better Auth plugins
@@ -354,7 +380,7 @@ type DeleteUserConfig struct {
 
 // UserConfig holds user configuration options
 type UserConfig struct {
-	// ModelName is the model name for the user (default: "user")
+	// ModelName is the model name for the users table
 	ModelName string
 
 	// Fields maps field names to different column names
@@ -375,13 +401,13 @@ type CookieCacheConfig struct {
 	// Enabled enables caching session in cookie (default: false)
 	Enabled bool
 
-	// MaxAge is the cache duration in seconds (default: 300 - 5 minutes)
-	MaxAge int
+	// MaxAge is the cache duration
+	MaxAge time.Duration
 }
 
 // SessionConfig holds session configuration
 type SessionConfig struct {
-	// ModelName is the model name for the session (default: "session")
+	// ModelName is the model name for the sessions table
 	ModelName string
 
 	// Fields maps field names to different column names
@@ -426,7 +452,7 @@ type AccountLinkingConfig struct {
 
 // AccountConfig holds account configuration options
 type AccountConfig struct {
-	// ModelName is the model name for the account
+	// ModelName is the model name for the accounts table
 	ModelName string
 
 	// Fields maps field names to different column names
@@ -444,7 +470,7 @@ type AccountConfig struct {
 
 // VerificationConfig holds verification configuration options
 type VerificationConfig struct {
-	// ModelName is the model name for the verification table
+	// ModelName is the model name for the verifications table
 	ModelName string
 
 	// Fields maps field names to different column names
@@ -483,7 +509,7 @@ type RateLimitOptions struct {
 	// Storage defines the storage type ("memory", "database", "secondary-storage")
 	Storage string
 
-	// ModelName is the name of the table for rate limiting if database is used (default: "rateLimit")
+	// ModelName is the name of the table for rate limiting if database is used
 	ModelName string
 }
 

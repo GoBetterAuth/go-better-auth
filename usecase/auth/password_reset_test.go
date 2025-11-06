@@ -40,9 +40,10 @@ func TestRequestPasswordReset_SendsEmailWithVerifyEndpoint(t *testing.T) {
 
 	service := NewService(config, repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
 
+	callbackUrl := "https://app.example/reset-password"
 	resp, err := service.RequestPasswordReset(context.Background(), &RequestPasswordResetRequest{
 		Email:       testUser.Email,
-		CallbackURL: "https://app.example/reset-password",
+		CallbackURL: &callbackUrl,
 	})
 	if err != nil {
 		t.Fatalf("RequestPasswordReset returned error: %v", err)

@@ -10,10 +10,10 @@ import (
 )
 
 type SignUpRequest struct {
-	Email       string `json:"email"`
-	Password    string `json:"password"`
-	Name        string `json:"name"`
-	CallbackURL string `json:"callback_url,omitempty"`
+	Email       string  `json:"email"`
+	Password    string  `json:"password"`
+	Name        string  `json:"name"`
+	CallbackURL *string `json:"callback_url,omitempty"`
 }
 
 type SignUpResponse struct {
@@ -30,7 +30,7 @@ func (h *AuthHandler) SignUpHandler(w http.ResponseWriter, r *http.Request) {
 
 	var req SignUpRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		ErrorResponse(w, http.StatusBadRequest, "invalid request body")
+		ErrorResponse(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
 

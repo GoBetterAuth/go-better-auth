@@ -170,7 +170,7 @@ func (a *Auth) Handler() http.Handler {
 	var oauthHandler *handler.OAuthHandler
 	if a.config.SocialProviders != nil {
 		providerRegistry := memory.NewOAuthProviderRegistry()
-		stateManager, err := storage.NewOAuthStateManager(a.config.Secret, 10*time.Minute)
+		stateManager, err := a.createOAuthStateManager()
 		if err != nil {
 			slog.Warn("failed to create OAuth state manager", "error", err)
 		} else {
@@ -281,6 +281,71 @@ func (a *Auth) authService() *auth.Service {
 	}
 
 	return service
+}
+
+// createOAuthStateManager creates an OAuth state manager based on configuration
+func (a *Auth) createOAuthStateManager() (*storage.OAuthStateManager, error) {
+	config := a.config.SocialProviders.OAuthStateStorage
+
+	// Set defaults if config is nil
+	if config == nil {
+		config = &domain.OAuthStateStorageConfig{
+			Type:            "memory",
+			CleanupInterval: 5 * time.Minute,
+			TTL:             10 * time.Minute,
+			KeyPrefix:       "oauth_state:",
+		}
+	}
+
+	// Apply defaults for missing values
+	if config.CleanupInterval <= 0 {
+		config.CleanupInterval = 5 * time.Minute
+	}
+	if config.TTL <= 0 {
+		config.TTL = 10 * time.Minute
+	}
+	if config.KeyPrefix == "" {
+		config.KeyPrefix = "oauth_state:"
+	}
+
+	var oauthStorage storage.OAuthStateStorage
+	var err error
+
+	switch config.Type {
+	case "database":
+		if a.repositories == nil {
+			return nil, fmt.Errorf("database storage requested but no repositories available")
+		}
+		db, dbErr := a.repositories.GetDB()
+		if dbErr != nil || db == nil {
+			return nil, fmt.Errorf("database storage requested but no database connection available: %w", dbErr)
+		}
+		oauthStorage, err = storage.NewDatabaseOAuthStateStorage(db, config.CleanupInterval)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create database OAuth state storage: %w", err)
+		}
+
+	case "secondary":
+		if a.config.SecondaryStorage == nil {
+			return nil, fmt.Errorf("secondary storage requested but not configured")
+		}
+		oauthStorage = storage.NewSecondaryOAuthStateStorage(a.config.SecondaryStorage, config.KeyPrefix)
+
+	case "memory", "":
+		// Default to in-memory storage
+		oauthStorage = storage.NewInMemoryOAuthStateStorage(config.CleanupInterval)
+
+	default:
+		return nil, fmt.Errorf("unsupported OAuth state storage type: %s", config.Type)
+	}
+
+	// Create the state manager with the configured storage
+	stateManager, err := storage.NewOAuthStateManagerWithStorage(a.config.Secret, config.TTL, oauthStorage)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OAuth state manager: %w", err)
+	}
+
+	return stateManager, nil
 }
 
 // composeWithOAuth wraps the base handler with OAuth routing capability

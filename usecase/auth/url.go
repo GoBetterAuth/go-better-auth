@@ -8,7 +8,7 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/domain"
 )
 
-func (s *Service) buildVerificationURL(token string, callbackURL string) string {
+func (s *Service) buildVerificationURL(token string, callbackURL *string) string {
 	if s == nil || s.config == nil {
 		return ""
 	}
@@ -22,8 +22,8 @@ func (s *Service) buildVerificationURL(token string, callbackURL string) string 
 	basePath = "/" + strings.Trim(basePath, "/")
 
 	verifyURL := fmt.Sprintf("%s%s/verify-email?token=%s", baseURL, basePath, url.QueryEscape(token))
-	if callbackURL != "" {
-		verifyURL += "&callbackURL=" + url.QueryEscape(callbackURL)
+	if callbackURL != nil && *callbackURL != "" {
+		verifyURL += "&callbackURL=" + url.QueryEscape(*callbackURL)
 	}
 
 	return verifyURL

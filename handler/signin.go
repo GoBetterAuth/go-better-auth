@@ -10,9 +10,9 @@ import (
 )
 
 type SignInRequest struct {
-	Email       string `json:"email"`
-	Password    string `json:"password"`
-	CallbackURL string `json:"callback_url,omitempty"`
+	Email       string  `json:"email"`
+	Password    string  `json:"password"`
+	CallbackURL *string `json:"callback_url,omitempty"`
 }
 
 type SignInResponse struct {
@@ -24,15 +24,6 @@ type SignInResponse struct {
 func (h *AuthHandler) SignInHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		ErrorResponse(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-
-	existingSession, existingUser, err := h.checkExistingSession(r)
-	if err == nil && existingSession != nil && existingUser != nil {
-		SuccessResponse(w, http.StatusOK, &SignInResponse{
-			Token: existingSession.Token,
-			User:  existingUser,
-		})
 		return
 	}
 

@@ -216,8 +216,11 @@ func TestSignOut_Valid(t *testing.T) {
 	}
 
 	// Verify session is deleted
-	_, err = repos.SessionRepo.FindByToken(testSession.Token)
-	if err == nil {
+	session, err := repos.SessionRepo.FindByToken(testSession.Token)
+	if err != nil {
+		t.Fatalf("Unexpected error when checking for deleted session: %v", err)
+	}
+	if session != nil {
 		t.Fatal("Expected session to be deleted, but it was found")
 	}
 }
@@ -298,4 +301,79 @@ func TestSignIn_WithDisabledSignUp(t *testing.T) {
 	if resp.User.Email != testUser.Email {
 		t.Errorf("Expected user email %s, got %s", testUser.Email, resp.User.Email)
 	}
+}
+
+// TestSignIn_ReturnsExistingSession tests that signing in multiple times returns the existing valid session
+func TestSignIn_ReturnsExistingSession(t *testing.T) {
+	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
+	defer cleanup()
+
+	password := "ValidPassword123!"
+	hashedPassword, err := crypto.HashPassword(password)
+	if err != nil {
+		t.Fatalf("Failed to hash password: %v", err)
+	}
+
+	// Manually create user and account
+	testUser := gobetterauthtests.CreateTestUser()
+	if err := repos.UserRepo.Create(testUser); err != nil {
+		t.Fatalf("Failed to create test user: %v", err)
+	}
+
+	testAccount := gobetterauthtests.CreateTestAccount(testUser.ID, &hashedPassword)
+	if err := repos.AccountRepo.Create(testAccount); err != nil {
+		t.Fatalf("Failed to create test account: %v", err)
+	}
+
+	service := NewService(
+		gobetterauthtests.CreateTestConfig(), repos.UserRepo, repos.SessionRepo, repos.AccountRepo, repos.VerificationRepo)
+
+	req := &SignInRequest{
+		Email:    testUser.Email,
+		Password: password,
+	}
+
+	// First sign in - should create a new session
+	resp1, err := service.SignIn(context.Background(), req)
+	if err != nil {
+		t.Fatalf("First SignIn failed: %v", err)
+	}
+
+	if resp1 == nil || resp1.Session == nil {
+		t.Fatal("First SignIn returned nil session")
+	}
+
+	firstSessionID := resp1.Session.ID
+	firstSessionToken := resp1.Session.Token
+
+	// Second sign in - should return the same existing session (anti-spam behavior)
+	resp2, err := service.SignIn(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Second SignIn failed: %v", err)
+	}
+
+	if resp2 == nil || resp2.Session == nil {
+		t.Fatal("Second SignIn returned nil session")
+	}
+
+	// Verify we got the same session
+	if resp2.Session.ID != firstSessionID {
+		t.Errorf("Expected same session ID %s, got %s", firstSessionID, resp2.Session.ID)
+	}
+
+	if resp2.Session.Token != firstSessionToken {
+		t.Errorf("Expected same session token %s, got %s", firstSessionToken, resp2.Session.Token)
+	}
+
+	// Verify only one session exists for this user
+	sessions, err := repos.SessionRepo.FindByUserID(testUser.ID)
+	if err != nil {
+		t.Fatalf("Failed to find sessions: %v", err)
+	}
+
+	if len(sessions) != 1 {
+		t.Errorf("Expected 1 session after multiple sign-ins, got %d", len(sessions))
+	}
+
+	t.Logf("Successfully verified anti-spam behavior: same session returned on multiple sign-ins")
 }

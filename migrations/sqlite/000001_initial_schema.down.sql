@@ -1,6 +1,6 @@
 -- Rollback initial schema
-DROP INDEX IF EXISTS idx_secondary_storage_expires_at;
-DROP TABLE IF EXISTS secondary_storage;
+DROP INDEX IF EXISTS idx_oauth_states_expires_at;
+DROP TABLE IF EXISTS oauth_states;
 
 DROP INDEX IF EXISTS idx_csrf_token;
 DROP INDEX IF EXISTS idx_csrf_expires_at;
@@ -15,6 +15,9 @@ DROP TABLE IF EXISTS totp_secrets;
 
 DROP INDEX IF EXISTS idx_two_factor_auth_user_id;
 DROP TABLE IF EXISTS two_factor_auth;
+
+DROP INDEX IF EXISTS idx_secondary_storage_expires_at;
+DROP TABLE IF EXISTS secondary_storage;
 
 DROP INDEX IF EXISTS idx_verifications_expires_at;
 DROP INDEX IF EXISTS idx_verifications_type;

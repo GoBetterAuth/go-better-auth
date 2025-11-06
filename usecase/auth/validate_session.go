@@ -2,8 +2,10 @@ package auth
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/GoBetterAuth/go-better-auth/domain/session"
+	"github.com/GoBetterAuth/go-better-auth/domain/user"
 )
 
 // ValidateSessionRequest contains the request data for validating a session
@@ -28,16 +30,14 @@ func (s *Service) ValidateSession(req *ValidateSessionRequest) (*ValidateSession
 	}
 
 	// Find session by token
-	sess, err := s.sessionRepo.FindByToken(req.SessionToken)
+	session, err := s.sessionRepo.FindByToken(req.SessionToken)
 	if err != nil {
-		// Session not found is not an error for validation, just return invalid
-		return &ValidateSessionResponse{
-			Session: nil,
-			Valid:   false,
-		}, nil
+		// Database error occurred
+		return nil, fmt.Errorf("failed to find session: %w", err)
 	}
 
-	if sess == nil {
+	if session == nil {
+		// Session not found, return invalid (not an error condition)
 		return &ValidateSessionResponse{
 			Session: nil,
 			Valid:   false,
@@ -45,15 +45,39 @@ func (s *Service) ValidateSession(req *ValidateSessionRequest) (*ValidateSession
 	}
 
 	// Check if session has expired
-	if sess.IsExpired() {
+	if session.IsExpired() {
 		return &ValidateSessionResponse{
-			Session: sess,
+			Session: session,
 			Valid:   false,
 		}, nil
 	}
 
 	return &ValidateSessionResponse{
-		Session: sess,
+		Session: session,
 		Valid:   true,
 	}, nil
+}
+
+// checkExistingSession checks if the user has a valid session from cookies
+// Returns the session and user if valid, nil otherwise
+func (s *Service) CheckExistingSessionFromCookie(cookie *http.Cookie) (*session.Session, *user.User, error) {
+	validateResp, err := s.ValidateSession(&ValidateSessionRequest{
+		SessionToken: cookie.Value,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if !validateResp.Valid || validateResp.Session == nil {
+		return nil, nil, nil
+	}
+
+	userResp, err := s.GetMe(&GetMeRequest{
+		UserID: validateResp.Session.UserID,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return validateResp.Session, userResp.User, nil
 }

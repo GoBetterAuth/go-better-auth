@@ -19,7 +19,7 @@ import (
 type SignInRequest struct {
 	Email       string
 	Password    string
-	CallbackURL string
+	CallbackURL *string
 	IPAddress   string
 	UserAgent   string
 }
@@ -91,10 +91,30 @@ func (s *Service) SignIn(ctx context.Context, req *SignInRequest) (*SignInRespon
 		_ = s.bruteForceService.ClearAttempts(req.Email)
 	}
 
+	// Check for existing valid sessions to prevent spam
+	existingSessions, err := s.sessionRepo.FindByUserID(user.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find existing sessions: %w", err)
+	}
+
+	// Look for a valid (non-expired) session
+	for _, existingSession := range existingSessions {
+		if !existingSession.IsExpired() {
+			fmt.Println("returning existing session...")
+			return &SignInResponse{Session: existingSession, User: user}, nil
+		}
+	}
+
 	// Generate session token
 	sessionToken, err := crypto.GenerateSessionToken()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate session token: %w", err)
+	}
+
+	// Use configured session expiration time, default to 7 days if not set
+	expiresIn := 7 * 24 * time.Hour
+	if s.config != nil && s.config.Session != nil && s.config.Session.ExpiresIn > 0 {
+		expiresIn = s.config.Session.ExpiresIn
 	}
 
 	// Create session with pointers for optional fields
@@ -106,7 +126,7 @@ func (s *Service) SignIn(ctx context.Context, req *SignInRequest) (*SignInRespon
 		Token:     sessionToken,
 		IPAddress: &ipAddr,
 		UserAgent: &userAgent,
-		ExpiresAt: time.Now().Add(7 * 24 * time.Hour), // 7 day session
+		ExpiresAt: time.Now().Add(expiresIn),
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -139,16 +159,15 @@ func (s *Service) SignIn(ctx context.Context, req *SignInRequest) (*SignInRespon
 				baseURL := s.config.BaseURL
 				basePath := s.config.BasePath
 				if basePath == "" {
-					basePath = "/api/auth"
+					basePath = "/auth"
 				}
 
 				callbackURLValue := ""
-				if req.CallbackURL != "" {
-					callbackURLValue = "&callbackURL=" + url.QueryEscape(req.CallbackURL)
+				if req.CallbackURL != nil && *req.CallbackURL != "" {
+					callbackURLValue = "&callbackURL=" + url.QueryEscape(*req.CallbackURL)
 				}
 				verifyURL := baseURL + basePath + "/verify-email?token=" + url.QueryEscape(verificationToken) + callbackURLValue
 
-				// Send email asynchronously with plain token
 				go func() {
 					if err := s.config.EmailVerification.SendVerificationEmail(ctx, user, verifyURL, verificationToken); err != nil {
 						slog.ErrorContext(ctx, "failed to send verification email on sign in", "user_id", user.ID, "email", user.Email, "error", err)
@@ -163,7 +182,6 @@ func (s *Service) SignIn(ctx context.Context, req *SignInRequest) (*SignInRespon
 	return &SignInResponse{Session: sessionCreated, User: user}, nil
 }
 
-// Validate validates the sign in request
 func (req *SignInRequest) Validate() error {
 	if req.Email == "" {
 		return fmt.Errorf("email is required")

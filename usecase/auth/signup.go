@@ -22,7 +22,7 @@ type SignUpRequest struct {
 	Email       string
 	Password    string
 	Name        string
-	CallbackURL string
+	CallbackURL *string
 }
 
 // SignUpResponse contains the response data for sign up
@@ -133,7 +133,7 @@ func (s *Service) SignUp(ctx context.Context, req *SignUpRequest) (*SignUpRespon
 }
 
 // sendVerificationEmailAsync sends the verification email asynchronously
-func (s *Service) sendVerificationEmailAsync(ctx context.Context, user *user.User, callbackURL string) {
+func (s *Service) sendVerificationEmailAsync(ctx context.Context, user *user.User, callbackURL *string) {
 	// Generate verification token
 	verificationToken, err := crypto.GenerateVerificationToken()
 	if err != nil {
@@ -167,8 +167,8 @@ func (s *Service) sendVerificationEmailAsync(ctx context.Context, user *user.Use
 		basePath = "/auth"
 	}
 	callbackURLValue := ""
-	if callbackURL != "" {
-		callbackURLValue = "&callbackURL=" + url.QueryEscape(callbackURL)
+	if callbackURL != nil && *callbackURL != "" {
+		callbackURLValue = "&callbackURL=" + url.QueryEscape(*callbackURL)
 	}
 	verifyURL := baseURL + basePath + "/verify-email?token=" + url.QueryEscape(verificationToken) + callbackURLValue
 

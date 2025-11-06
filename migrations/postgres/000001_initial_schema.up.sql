@@ -2,7 +2,23 @@
 -- Enable UUIDs
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- Create users table
+-- ---------------------------
+-- FUNCTIONS
+-- ---------------------------
+
+-- Create a function to automatically update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- ---------------------------
+-- USERS
+-- ---------------------------
+
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(255) NOT NULL,
@@ -15,7 +31,16 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
--- Create sessions table
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
+CREATE TRIGGER update_users_updated_at
+  BEFORE UPDATE ON users
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- ---------------------------
+-- SESSIONS
+-- ---------------------------
+
 CREATE TABLE IF NOT EXISTS sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL,
@@ -32,7 +57,16 @@ CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
 
--- Create accounts table (for credentials and OAuth providers)
+DROP TRIGGER IF EXISTS update_sessions_updated_at ON sessions;
+CREATE TRIGGER update_sessions_updated_at
+  BEFORE UPDATE ON sessions
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- ---------------------------
+-- ACCOUNTS (for credentials and OAuth providers)
+-- ---------------------------
+
 CREATE TABLE IF NOT EXISTS accounts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL,
@@ -54,7 +88,16 @@ CREATE TABLE IF NOT EXISTS accounts (
 CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON accounts(user_id);
 CREATE INDEX IF NOT EXISTS idx_accounts_account_provider ON accounts(account_id, provider_id);
 
--- Create verifications table (for email verification, password reset tokens, and email change tokens)
+DROP TRIGGER IF EXISTS update_accounts_updated_at ON accounts;
+CREATE TRIGGER update_accounts_updated_at
+  BEFORE UPDATE ON accounts
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- ---------------------------
+-- VERIFICATIONS (for email verification, password reset tokens, and email change tokens)
+-- ---------------------------
+
 CREATE TABLE IF NOT EXISTS verifications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID,
@@ -73,7 +116,30 @@ CREATE INDEX IF NOT EXISTS idx_verifications_token ON verifications(token);
 CREATE INDEX IF NOT EXISTS idx_verifications_type ON verifications(type);
 CREATE INDEX IF NOT EXISTS idx_verifications_expires_at ON verifications(expires_at);
 
--- Create two_factor_auth table (for storing MFA configurations)
+-- ---------------------------
+-- SECONDARY STORAGE (key-value storage e.g. sessions, rate limiting, etc.)
+-- ---------------------------
+
+CREATE TABLE IF NOT EXISTS secondary_storage (
+  key VARCHAR(255) PRIMARY KEY,
+  value TEXT NOT NULL,
+  expires_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_secondary_storage_expires_at ON secondary_storage(expires_at);
+
+DROP TRIGGER IF EXISTS update_secondary_storage_updated_at ON secondary_storage;
+CREATE TRIGGER update_secondary_storage_updated_at
+  BEFORE UPDATE ON secondary_storage
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+  
+-- ---------------------------
+-- TWO FACTOR AUTH (for storing MFA configurations) (WIP)
+-- ---------------------------
+
 CREATE TABLE IF NOT EXISTS two_factor_auth (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL UNIQUE,
@@ -90,7 +156,16 @@ CREATE TABLE IF NOT EXISTS two_factor_auth (
 CREATE INDEX IF NOT EXISTS idx_two_factor_auth_user_id ON two_factor_auth(user_id);
 CREATE INDEX IF NOT EXISTS idx_two_factor_auth_method ON two_factor_auth(method);
 
--- Create totp_secrets table (for storing TOTP-specific secrets)
+DROP TRIGGER IF EXISTS update_two_factor_auth_updated_at ON two_factor_auth;
+CREATE TRIGGER update_two_factor_auth_updated_at
+  BEFORE UPDATE ON two_factor_auth
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- ---------------------------
+-- TOTP SECRETS (for storing TOTP-specific secrets)
+-- ---------------------------
+
 CREATE TABLE IF NOT EXISTS totp_secrets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL,
@@ -108,7 +183,16 @@ CREATE TABLE IF NOT EXISTS totp_secrets (
 CREATE INDEX IF NOT EXISTS idx_totp_secrets_user_id ON totp_secrets(user_id);
 CREATE INDEX IF NOT EXISTS idx_totp_secrets_created_at ON totp_secrets(created_at DESC);
 
--- Create mfa_challenges table (for storing pending MFA challenges during login)
+DROP TRIGGER IF EXISTS update_totp_secrets_updated_at ON totp_secrets;
+CREATE TRIGGER update_totp_secrets_updated_at
+  BEFORE UPDATE ON totp_secrets
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- ---------------------------
+-- MFA CHALLENGES (for storing pending MFA challenges during login)
+-- ---------------------------
+
 CREATE TABLE IF NOT EXISTS mfa_challenges (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL,
@@ -123,49 +207,20 @@ CREATE INDEX IF NOT EXISTS idx_mfa_challenges_user_id ON mfa_challenges(user_id)
 CREATE INDEX IF NOT EXISTS idx_mfa_challenges_method ON mfa_challenges(method);
 CREATE INDEX IF NOT EXISTS idx_mfa_challenges_expires_at ON mfa_challenges(expires_at);
 
--- Create a function to automatically update updated_at timestamp
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ language 'plpgsql';
+-- ---------------------------
+-- CSRF TOKENS
+-- ---------------------------
 
--- Apply the trigger to users table
-DROP TRIGGER IF EXISTS update_users_updated_at ON users;
-CREATE TRIGGER update_users_updated_at
-  BEFORE UPDATE ON users
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+CREATE TABLE IF NOT EXISTS csrf_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  token VARCHAR(255) UNIQUE NOT NULL,
+  secret VARCHAR(255) NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
 
--- Apply the trigger to sessions table
-DROP TRIGGER IF EXISTS update_sessions_updated_at ON sessions;
-CREATE TRIGGER update_sessions_updated_at
-  BEFORE UPDATE ON sessions
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
-
--- Apply the trigger to accounts table
-DROP TRIGGER IF EXISTS update_accounts_updated_at ON accounts;
-CREATE TRIGGER update_accounts_updated_at
-  BEFORE UPDATE ON accounts
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
-
--- Apply the trigger to two_factor_auth table
-DROP TRIGGER IF EXISTS update_two_factor_auth_updated_at ON two_factor_auth;
-CREATE TRIGGER update_two_factor_auth_updated_at
-  BEFORE UPDATE ON two_factor_auth
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
-
--- Apply the trigger to totp_secrets table
-DROP TRIGGER IF EXISTS update_totp_secrets_updated_at ON totp_secrets;
-CREATE TRIGGER update_totp_secrets_updated_at
-  BEFORE UPDATE ON totp_secrets
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+CREATE INDEX IF NOT EXISTS idx_csrf_expires_at ON csrf_tokens(expires_at);
+CREATE INDEX IF NOT EXISTS idx_csrf_token ON csrf_tokens(token);
 
 -- Create a cleanup function for expired records
 CREATE OR REPLACE FUNCTION cleanup_expired_records()
@@ -182,25 +237,23 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create secondary storage table for key-value storage (sessions, rate limiting, etc.)
-CREATE TABLE IF NOT EXISTS secondary_storage (
-    key VARCHAR(255) PRIMARY KEY,
-    value TEXT NOT NULL,
-    expires_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+-- ---------------------------
+-- OAUTH STATES (for storing OAuth state storage)
+-- ---------------------------
+
+CREATE TABLE IF NOT EXISTS oauth_states (
+  id VARCHAR(255) PRIMARY KEY,
+  state_data TEXT NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_secondary_storage_expires_at ON secondary_storage(expires_at);
+CREATE INDEX IF NOT EXISTS idx_oauth_states_expires_at ON oauth_states(expires_at);
 
--- Apply the trigger to secondary_storage table
-DROP TRIGGER IF EXISTS update_secondary_storage_updated_at ON secondary_storage;
-CREATE TRIGGER update_secondary_storage_updated_at
-  BEFORE UPDATE ON secondary_storage
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+-- ---------------------------
+-- COMMENTS
+-- ---------------------------
 
--- Add table comments
 COMMENT ON TABLE users IS 'Stores user account information';
 COMMENT ON TABLE sessions IS 'Stores active user sessions';
 COMMENT ON TABLE accounts IS 'Stores authentication provider accounts (credentials and OAuth)';
@@ -208,4 +261,6 @@ COMMENT ON TABLE verifications IS 'Stores temporary verification tokens for emai
 COMMENT ON TABLE two_factor_auth IS 'Stores two-factor authentication configurations';
 COMMENT ON TABLE totp_secrets IS 'Stores TOTP-specific secrets and backup codes';
 COMMENT ON TABLE mfa_challenges IS 'Stores pending MFA challenges during login';
+COMMENT ON TABLE csrf_tokens IS 'Stores CSRF tokens for security';
 COMMENT ON TABLE secondary_storage IS 'Stores key-value pairs for sessions, rate limiting, and other temporary data';
+COMMENT ON TABLE oauth_states IS 'Stores OAuth state data for login flows';

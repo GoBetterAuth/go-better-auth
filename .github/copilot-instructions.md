@@ -89,6 +89,7 @@
   - End-to-End Tests: Test the entire application flow from the client perspective.
   - Table-Driven Tests: Use table-driven tests for multiple test cases, especially for handlers and validation.
   - Make sure that the tests reflect production too so that the tests are relevant and meaningful.
+  - Always run `make test || grep "FAIL"` to run all tests and to detect any failing tests to fix.
 
 - Security:
 

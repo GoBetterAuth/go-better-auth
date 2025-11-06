@@ -145,9 +145,12 @@ func TestCachedSessionRepository_Delete(t *testing.T) {
 	}
 
 	// Verify it's deleted from primary
-	_, err = primary.FindByToken(sess.Token)
-	if err == nil {
-		t.Error("expected session to be deleted from primary")
+	deletedSess, err := primary.FindByToken(sess.Token)
+	if err != nil {
+		t.Fatalf("unexpected error from primary repository: %v", err)
+	}
+	if deletedSess != nil {
+		t.Error("expected session to be deleted from primary, but it still exists")
 	}
 }
 

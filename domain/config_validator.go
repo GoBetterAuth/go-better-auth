@@ -135,7 +135,7 @@ func validateURL(urlStr string) error {
 // validateDatabaseConfig validates database configuration
 func validateDatabaseConfig(config *DatabaseConfig) error {
 	if config.Provider == "" {
-		return fmt.Errorf("Provider is required")
+		return fmt.Errorf("provider is required")
 	}
 
 	provider := strings.ToLower(config.Provider)
@@ -260,11 +260,11 @@ func validateRateLimitConfig(config *RateLimitOptions) error {
 	}
 
 	if config.Window <= 0 {
-		return fmt.Errorf("Window must be positive")
+		return fmt.Errorf("window must be positive")
 	}
 
 	if config.Max <= 0 {
-		return fmt.Errorf("Max must be positive")
+		return fmt.Errorf("max must be positive")
 	}
 
 	if config.Algorithm != "" {

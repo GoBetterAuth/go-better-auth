@@ -16,7 +16,7 @@ import (
 // RequestPasswordResetRequest contains the request data for requesting a password reset
 type RequestPasswordResetRequest struct {
 	Email       string
-	CallbackURL string
+	CallbackURL *string
 }
 
 // RequestPasswordResetResponse contains the response data for requesting a password reset
@@ -152,7 +152,7 @@ func (s *Service) ResetPassword(req *ResetPasswordRequest) (*ResetPasswordRespon
 	}, nil
 }
 
-func (s *Service) sendResetPasswordEmail(ctx context.Context, user *user.User, token string, callbackURL string) {
+func (s *Service) sendResetPasswordEmail(ctx context.Context, user *user.User, token string, callbackURL *string) {
 	if s.config.EmailAndPassword == nil || !s.config.EmailAndPassword.Enabled || s.config.EmailAndPassword.SendResetPassword == nil {
 		return
 	}

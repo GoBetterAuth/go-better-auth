@@ -176,8 +176,11 @@ func TestRefreshToken_Valid(t *testing.T) {
 		t.Error("Expected session expiration to be refreshed")
 	}
 
-	_, err = repos.SessionRepo.FindByToken(oldToken)
-	if err == nil {
+	oldSession, err := repos.SessionRepo.FindByToken(oldToken)
+	if err != nil {
+		t.Errorf("Unexpected error when checking old token: %v", err)
+	}
+	if oldSession != nil {
 		t.Error("Expected old token to be invalid")
 	}
 

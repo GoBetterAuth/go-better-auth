@@ -15,6 +15,7 @@ func TestNewOAuthStateManager(t *testing.T) {
 	manager, err := NewOAuthStateManager(secret, 10*time.Minute)
 	require.NoError(t, err)
 	assert.NotNil(t, manager)
+	defer manager.Close()
 }
 
 func TestNewOAuthStateManager_EmptySecret(t *testing.T) {
@@ -27,6 +28,7 @@ func TestOAuthStateManager_GenerateState(t *testing.T) {
 	secret := "test-secret"
 	manager, err := NewOAuthStateManager(secret, 10*time.Minute)
 	require.NoError(t, err)
+	defer manager.Close()
 
 	state, err := manager.GenerateState(string(account.ProviderGoogle), "/dashboard", "")
 	require.NoError(t, err)
@@ -113,6 +115,7 @@ func TestOAuthStateManager_ValidateState_ReplayAttack(t *testing.T) {
 	secret := "test-secret"
 	manager, err := NewOAuthStateManager(secret, 10*time.Minute)
 	require.NoError(t, err)
+	defer manager.Close()
 
 	// Generate state
 	encryptedState, err := manager.GenerateState(string(account.ProviderGoogle), "/dashboard", "")
@@ -127,7 +130,7 @@ func TestOAuthStateManager_ValidateState_ReplayAttack(t *testing.T) {
 	validatedState, err = manager.ValidateState(encryptedState)
 	assert.Error(t, err)
 	assert.Nil(t, validatedState)
-	assert.Contains(t, err.Error(), "replay attack")
+	assert.Contains(t, err.Error(), "not found")
 }
 
 func TestOAuthStateManager_ValidateState_DifferentSecret(t *testing.T) {
@@ -216,4 +219,60 @@ func TestOAuthStateManager_MultipleProviders(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, string(provider), validatedState.ProviderID)
 	}
+}
+
+func TestOAuthStateManager_SecretRotation(t *testing.T) {
+	secret1 := "test-secret-key-1"
+	secret2 := "test-secret-key-2"
+
+	manager, err := NewOAuthStateManager(secret1, 10*time.Minute)
+	require.NoError(t, err)
+	defer manager.Close()
+
+	// Generate state with first secret
+	encryptedState1, err := manager.GenerateState(string(account.ProviderGoogle), "/dashboard", "user123")
+	require.NoError(t, err)
+
+	// Rotate secret
+	err = manager.RotateSecret(secret2)
+	require.NoError(t, err)
+
+	// Check version numbers
+	assert.Equal(t, 2, manager.GetCurrentSecretVersion())
+
+	versions := manager.GetAvailableSecretVersions()
+	assert.Equal(t, 2, len(versions))
+
+	// Generate state with new secret
+	encryptedState2, err := manager.GenerateState(string(account.ProviderGitHub), "/profile", "user456")
+	require.NoError(t, err)
+
+	// Both states should validate successfully
+	state1, err := manager.ValidateState(encryptedState1)
+	require.NoError(t, err)
+	assert.Equal(t, string(account.ProviderGoogle), state1.ProviderID)
+	assert.Equal(t, "user123", state1.UserID)
+
+	state2, err := manager.ValidateState(encryptedState2)
+	require.NoError(t, err)
+	assert.Equal(t, string(account.ProviderGitHub), state2.ProviderID)
+	assert.Equal(t, "user456", state2.UserID)
+}
+
+func TestOAuthStateManager_WithCustomStorage(t *testing.T) {
+	secret := "test-secret-key"
+	storage := NewInMemoryOAuthStateStorage(5 * time.Minute)
+
+	manager, err := NewOAuthStateManagerWithStorage(secret, 10*time.Minute, storage)
+	require.NoError(t, err)
+	defer manager.Close()
+
+	// Generate and validate state
+	encryptedState, err := manager.GenerateState(string(account.ProviderGoogle), "/dashboard", "user123")
+	require.NoError(t, err)
+
+	validatedState, err := manager.ValidateState(encryptedState)
+	require.NoError(t, err)
+	assert.Equal(t, string(account.ProviderGoogle), validatedState.ProviderID)
+	assert.Equal(t, "user123", validatedState.UserID)
 }

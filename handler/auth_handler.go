@@ -4,8 +4,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/GoBetterAuth/go-better-auth/domain/session"
-	"github.com/GoBetterAuth/go-better-auth/domain/user"
 	"github.com/GoBetterAuth/go-better-auth/usecase/auth"
 )
 
@@ -73,34 +71,4 @@ func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.NotFound(w, r)
 	}
-}
-
-// checkExistingSession checks if the user has a valid session from cookies
-// Returns the session and user if valid, nil otherwise
-func (h *AuthHandler) checkExistingSession(r *http.Request) (*session.Session, *user.User, error) {
-	cookie, err := r.Cookie(h.cookieManager.GetSessionCookieName())
-	if err != nil {
-		// No cookie found, not an error
-		return nil, nil, nil
-	}
-
-	validateResp, err := h.service.ValidateSession(&auth.ValidateSessionRequest{
-		SessionToken: cookie.Value,
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if !validateResp.Valid || validateResp.Session == nil {
-		return nil, nil, nil
-	}
-
-	userResp, err := h.service.GetMe(&auth.GetMeRequest{
-		UserID: validateResp.Session.UserID,
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return validateResp.Session, userResp.User, nil
 }

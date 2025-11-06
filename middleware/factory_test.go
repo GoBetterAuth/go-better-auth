@@ -234,7 +234,10 @@ func TestAuthMiddlewareFactory_WithValidSession(t *testing.T) {
 	middleware := factory.AuthHandler(testHandler)
 
 	req := httptest.NewRequest("GET", "/protected", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.AddCookie(&http.Cookie{
+		Name:  factoryTestsCookieName,
+		Value: token,
+	})
 
 	w := httptest.NewRecorder()
 	middleware.ServeHTTP(w, req)

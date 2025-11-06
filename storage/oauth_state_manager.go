@@ -1,9 +1,9 @@
 package storage
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/internal/crypto"
@@ -19,16 +19,22 @@ type OAuthState struct {
 	ExpiresAt  time.Time `json:"expires_at"`
 }
 
-// OAuthStateManager manages OAuth state parameters with CSRF protection
+// OAuthStateManager manages OAuth state parameters with CSRF protection.
+// It now supports pluggable storage backends and secret rotation for production deployments.
 type OAuthStateManager struct {
-	cipher *crypto.CipherManager
-	ttl    time.Duration
-	mu     sync.RWMutex
-	states map[string]*OAuthState // For in-memory validation
+	cipher  *crypto.VersionedCipherManager
+	storage OAuthStateStorage
+	ttl     time.Duration
 }
 
-// NewOAuthStateManager creates a new OAuth state manager
+// NewOAuthStateManager creates a new OAuth state manager with in-memory storage (for backward compatibility)
 func NewOAuthStateManager(secret string, ttl time.Duration) (*OAuthStateManager, error) {
+	storage := NewInMemoryOAuthStateStorage(5 * time.Minute) // Default cleanup interval
+	return NewOAuthStateManagerWithStorage(secret, ttl, storage)
+}
+
+// NewOAuthStateManagerWithStorage creates a new OAuth state manager with custom storage
+func NewOAuthStateManagerWithStorage(secret string, ttl time.Duration, storage OAuthStateStorage) (*OAuthStateManager, error) {
 	if secret == "" {
 		return nil, fmt.Errorf("secret cannot be empty")
 	}
@@ -37,16 +43,20 @@ func NewOAuthStateManager(secret string, ttl time.Duration) (*OAuthStateManager,
 		ttl = 10 * time.Minute // Default TTL
 	}
 
-	// Create cipher manager for encryption and signing
-	cipher, err := crypto.NewCipherManager(secret)
+	if storage == nil {
+		return nil, fmt.Errorf("storage cannot be nil")
+	}
+
+	// Create versioned cipher manager for encryption, signing, and secret rotation
+	cipher, err := crypto.NewVersionedCipherManager(secret, 5) // Keep last 5 secret versions
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cipher manager: %w", err)
 	}
 
 	return &OAuthStateManager{
-		cipher: cipher,
-		ttl:    ttl,
-		states: make(map[string]*OAuthState),
+		cipher:  cipher,
+		storage: storage,
+		ttl:     ttl,
 	}, nil
 }
 
@@ -78,16 +88,20 @@ func (m *OAuthStateManager) GenerateState(providerID string, redirectTo string, 
 		return "", fmt.Errorf("failed to marshal state: %w", err)
 	}
 
-	// Encrypt and sign the data using cipher manager
+	// Encrypt and sign the data using versioned cipher manager
 	encrypted, err := m.cipher.Encrypt(string(data))
 	if err != nil {
 		return "", fmt.Errorf("failed to encrypt state: %w", err)
 	}
 
-	// Store in memory for validation
-	m.mu.Lock()
-	m.states[state.State] = state
-	m.mu.Unlock()
+	// Store using pluggable storage backend
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	err = m.storage.Store(ctx, state.State, state, m.ttl)
+	if err != nil {
+		return "", fmt.Errorf("failed to store state: %w", err)
+	}
 
 	// Return the encrypted state
 	return encrypted, nil
@@ -99,7 +113,7 @@ func (m *OAuthStateManager) ValidateState(encryptedState string) (*OAuthState, e
 		return nil, fmt.Errorf("state cannot be empty")
 	}
 
-	// Decrypt and verify the state
+	// Decrypt and verify the state (supports multiple secret versions)
 	decrypted, err := m.cipher.Decrypt(encryptedState)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt state: %w", err)
@@ -112,50 +126,48 @@ func (m *OAuthStateManager) ValidateState(encryptedState string) (*OAuthState, e
 		return nil, fmt.Errorf("failed to unmarshal state: %w", err)
 	}
 
-	// Check expiration
-	if time.Now().After(state.ExpiresAt) {
-		// Clean up expired state
-		m.mu.Lock()
-		delete(m.states, state.State)
-		m.mu.Unlock()
-		return nil, fmt.Errorf("state expired")
-	}
+	// Retrieve state from storage backend
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-	// Verify state exists in our records
-	m.mu.RLock()
-	storedState, exists := m.states[state.State]
-	m.mu.RUnlock()
-
-	if !exists {
-		return nil, fmt.Errorf("state not found: possible replay attack")
+	storedState, err := m.storage.Retrieve(ctx, state.State)
+	if err != nil {
+		return nil, fmt.Errorf("state not found or expired: %w", err)
 	}
 
 	// Validate state matches
 	if storedState.ProviderID != state.ProviderID {
-		return nil, fmt.Errorf("provider mismatch")
+		return nil, fmt.Errorf("provider mismatch: possible tampering")
+	}
+
+	// Additional validation: compare encrypted state data
+	if storedState.State != state.State {
+		return nil, fmt.Errorf("state token mismatch: possible replay attack")
 	}
 
 	// Clean up used state (one-time use)
-	m.mu.Lock()
-	delete(m.states, state.State)
-	m.mu.Unlock()
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel2()
 
-	return &state, nil
+	err = m.storage.Delete(ctx2, state.State)
+	if err != nil {
+		// Log error but don't fail validation - state was valid
+		_ = err // TODO: Add structured logging here
+	}
+
+	return storedState, nil
 }
 
 // CleanupExpiredStates removes expired state parameters
 func (m *OAuthStateManager) CleanupExpiredStates() int {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
 
-	now := time.Now()
-	count := 0
-
-	for stateID, state := range m.states {
-		if now.After(state.ExpiresAt) {
-			delete(m.states, stateID)
-			count++
-		}
+	count, err := m.storage.CleanupExpired(ctx)
+	if err != nil {
+		// Log error but return 0
+		_ = err // TODO: Add structured logging here
+		return 0
 	}
 
 	return count
@@ -163,7 +175,41 @@ func (m *OAuthStateManager) CleanupExpiredStates() int {
 
 // Count returns the number of active states
 func (m *OAuthStateManager) Count() int {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return len(m.states)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	count, err := m.storage.Count(ctx)
+	if err != nil {
+		// Log error but return 0
+		_ = err // TODO: Add structured logging here
+		return 0
+	}
+
+	return count
+}
+
+// RotateSecret adds a new secret version for encryption while maintaining
+// backward compatibility for decryption. This enables seamless secret rotation
+// in production environments.
+func (m *OAuthStateManager) RotateSecret(newSecret string) error {
+	if newSecret == "" {
+		return fmt.Errorf("new secret cannot be empty")
+	}
+
+	return m.cipher.AddSecret(newSecret)
+}
+
+// GetCurrentSecretVersion returns the current secret version being used for encryption
+func (m *OAuthStateManager) GetCurrentSecretVersion() int {
+	return m.cipher.GetCurrentVersion()
+}
+
+// GetAvailableSecretVersions returns all available secret versions for decryption
+func (m *OAuthStateManager) GetAvailableSecretVersions() []int {
+	return m.cipher.GetAvailableVersions()
+}
+
+// Close releases any resources used by the storage backend
+func (m *OAuthStateManager) Close() error {
+	return m.storage.Close()
 }

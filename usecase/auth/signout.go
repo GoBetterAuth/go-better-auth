@@ -22,6 +22,10 @@ func (s *Service) SignOut(req *SignOutRequest) error {
 	// Find session by token
 	session, err := s.sessionRepo.FindByToken(req.SessionToken)
 	if err != nil {
+		return fmt.Errorf("failed to find session: %w", err)
+	}
+
+	if session == nil {
 		return fmt.Errorf("session not found")
 	}
 

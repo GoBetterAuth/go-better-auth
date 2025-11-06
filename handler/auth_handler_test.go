@@ -714,7 +714,7 @@ func TestSignUpHandler_ReuseExistingSession(t *testing.T) {
 	require.NotNil(t, sessionCookie, "Session cookie should be set")
 
 	// Try to sign up again with different details but include the existing session cookie
-	// This should return the existing session instead of creating a new user
+	// This should create a new user since signup doesn't check existing sessions
 	signUp2Req := SignUpRequest{
 		Email:    "different@example.com",
 		Password: "DifferentPassword123!",
@@ -727,7 +727,7 @@ func TestSignUpHandler_ReuseExistingSession(t *testing.T) {
 	w2 := httptest.NewRecorder()
 
 	handler.SignUpHandler(w2, req2)
-	require.Equal(t, http.StatusOK, w2.Code) // Should be 200 (existing session) not 201 (created)
+	require.Equal(t, http.StatusCreated, w2.Code) // Should be 201 (created) since it's a new user
 
 	signUp2BodyStr := w2.Body.String()
 
@@ -743,8 +743,8 @@ func TestSignUpHandler_ReuseExistingSession(t *testing.T) {
 	err = json.Unmarshal(signUp2DataBytes, &signUp2Response)
 	require.NoError(t, err)
 
-	// Verify that the same session is returned (not a new user)
-	require.Equal(t, originalToken, signUp2Response.Token)
-	require.Equal(t, signUpResponse.User.ID, signUp2Response.User.ID)
-	require.Equal(t, signUpResponse.User.Email, signUp2Response.User.Email) // Should be original email, not the new one
+	// Verify that a new user is created with the different email
+	require.NotEqual(t, originalToken, signUp2Response.Token)
+	require.NotEqual(t, signUpResponse.User.ID, signUp2Response.User.ID)
+	require.Equal(t, "different@example.com", signUp2Response.User.Email)
 }

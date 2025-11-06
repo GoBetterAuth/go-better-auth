@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/GoBetterAuth/go-better-auth/domain"
-	"github.com/GoBetterAuth/go-better-auth/repository/gorm"
 	gobetterauthtests "github.com/GoBetterAuth/go-better-auth/tests"
 	"github.com/GoBetterAuth/go-better-auth/usecase/auth"
 )
@@ -19,33 +18,6 @@ import (
 const (
 	authTestsCookieName = "test_session_token"
 )
-
-// setupTestRepositories creates GORM repositories with SQLite in-memory database for testing
-func setupTestRepositories(t *testing.T) *gorm.Repositories {
-	t.Helper()
-
-	cfg := &gorm.Config{
-		Provider:         "sqlite",
-		ConnectionString: ":memory:",
-		LogQueries:       false,
-	}
-
-	repos, err := gorm.NewRepositories(cfg)
-	require.NoError(t, err, "Failed to create test repositories")
-
-	// Run migrations
-	err = gobetterauthtests.RunTestMigrations(t, repos)
-	require.NoError(t, err, "Failed to run test migrations")
-
-	// Clean up after test
-	t.Cleanup(func() {
-		if repos != nil {
-			repos.Close()
-		}
-	})
-
-	return repos
-}
 
 // ===== Context Tests =====
 
@@ -108,7 +80,7 @@ func TestGetSessionToken_Missing(t *testing.T) {
 
 // ===== AuthMiddleware Tests =====
 
-func TestAuthMiddleware_ValidBearerToken(t *testing.T) {
+func TestAuthMiddleware_ValidCookieToken(t *testing.T) {
 	// Setup
 	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
 	defer cleanup()
@@ -146,9 +118,12 @@ func TestAuthMiddleware_ValidBearerToken(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	// Create request with Bearer token
+	// Create request with cookie token
 	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.AddCookie(&http.Cookie{
+		Name:  authTestsCookieName,
+		Value: token,
+	})
 
 	w := httptest.NewRecorder()
 	protectedHandler.ServeHTTP(w, req)
@@ -200,32 +175,6 @@ func TestAuthMiddleware_InvalidToken(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
 	req.Header.Set("Authorization", "Bearer invalid-token")
-
-	w := httptest.NewRecorder()
-	protectedHandler.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusUnauthorized, w.Code)
-}
-
-func TestAuthMiddleware_InvalidBearerFormat(t *testing.T) {
-	repos, cleanup := gobetterauthtests.SetupTestRepositories(t)
-	defer cleanup()
-
-	service := auth.NewService(
-		&domain.Config{},
-		repos.UserRepo,
-		repos.SessionRepo,
-		repos.AccountRepo,
-		repos.VerificationRepo,
-	)
-
-	middleware := NewAuthMiddleware(service, authTestsCookieName)
-	protectedHandler := middleware.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
-	req.Header.Set("Authorization", "invalid-format")
 
 	w := httptest.NewRecorder()
 	protectedHandler.ServeHTTP(w, req)
@@ -326,7 +275,10 @@ func TestAuthMiddleware_HandlerFunc(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.AddCookie(&http.Cookie{
+		Name:  authTestsCookieName,
+		Value: token,
+	})
 
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
@@ -376,7 +328,10 @@ func TestOptionalAuthMiddleware_ValidToken(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/public", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.AddCookie(&http.Cookie{
+		Name:  authTestsCookieName,
+		Value: token,
+	})
 
 	w := httptest.NewRecorder()
 	protectedHandler.ServeHTTP(w, req)
@@ -481,7 +436,10 @@ func TestAuthMiddleware_SetSessionTokenInContext(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.AddCookie(&http.Cookie{
+		Name:  authTestsCookieName,
+		Value: token,
+	})
 
 	w := httptest.NewRecorder()
 	protectedHandler.ServeHTTP(w, req)

@@ -2,15 +2,12 @@ package middleware
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/GoBetterAuth/go-better-auth/usecase/auth"
 )
 
 // AuthMiddleware validates the session token and extracts the user ID from the request
-// It expects the token in either:
-// 1. Authorization header (Bearer <token>)
-// 2. Cookie with a configured name
+// It expects the token in a cookie with a configured name
 //
 // On successful validation, it sets UserID and SessionToken in the request context
 // If validation fails, it returns a 401 Unauthorized response
@@ -60,18 +57,8 @@ func (m *AuthMiddleware) HandlerFunc(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // extractToken extracts the session token from the request
-// It tries Authorization header first, then falls back to cookies
+// It checks for cookies only (no Bearer tokens until JWT support is added)
 func (m *AuthMiddleware) extractToken(r *http.Request) (string, error) {
-	// Try Authorization header first (Bearer token)
-	authHeader := r.Header.Get("Authorization")
-	if authHeader != "" {
-		parts := strings.Split(authHeader, " ")
-		if len(parts) == 2 && parts[0] == "Bearer" {
-			return parts[1], nil
-		}
-	}
-
-	// Try cookie
 	cookie, err := r.Cookie(m.cookieName)
 	if err == nil && cookie.Value != "" {
 		return cookie.Value, nil
@@ -134,16 +121,6 @@ func (m *OptionalAuthMiddleware) HandlerFunc(next http.HandlerFunc) http.Handler
 
 // extractToken extracts the session token from the request
 func (m *OptionalAuthMiddleware) extractToken(r *http.Request) (string, error) {
-	// Try Authorization header first (Bearer token)
-	authHeader := r.Header.Get("Authorization")
-	if authHeader != "" {
-		parts := strings.Split(authHeader, " ")
-		if len(parts) == 2 && parts[0] == "Bearer" {
-			return parts[1], nil
-		}
-	}
-
-	// Try cookie
 	cookie, err := r.Cookie(m.cookieName)
 	if err == nil && cookie.Value != "" {
 		return cookie.Value, nil

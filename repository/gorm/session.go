@@ -118,7 +118,7 @@ func (r *SessionRepository) FindByToken(token string) (*session.Session, error) 
 	err := r.db.Where("token = ?", token).First(&model).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("session not found")
+			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to query session: %w", err)
 	}
