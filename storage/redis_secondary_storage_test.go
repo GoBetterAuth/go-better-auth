@@ -16,9 +16,9 @@ import (
 func setupRedisContainer(t *testing.T) (*RedisSecondaryStorage, func()) {
 	ctx := context.Background()
 	req := testcontainers.ContainerRequest{
-		Image:        "redis:8.2",
+		Image:        "redis:8.2-alpine",
 		ExposedPorts: []string{"6379/tcp"},
-		WaitingFor:   wait.ForListeningPort("6379/tcp"),
+		WaitingFor:   wait.ForListeningPort("6379/tcp").WithStartupTimeout(30 * time.Second),
 	}
 	redisC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
@@ -44,6 +44,14 @@ func setupRedisContainer(t *testing.T) (*RedisSecondaryStorage, func()) {
 	require.NoError(t, err)
 
 	terminate := func() {
+		// Clean up test keys first
+		ctx := context.Background()
+		if storage.client != nil {
+			iter := storage.client.Scan(ctx, 0, "test:*", 0).Iterator()
+			for iter.Next(ctx) {
+				storage.client.Del(ctx, iter.Val())
+			}
+		}
 		storage.Close()
 		redisC.Terminate(ctx)
 	}
