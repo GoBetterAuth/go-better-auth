@@ -5,16 +5,16 @@
     "dockerfile": "Dockerfile"
   },
   "workspaceFolder": "/workspaces/go-better-auth",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "moby": false
+    }
+  },
   "containerEnv": {
     "DISPLAY": "host.docker.internal:0.0",
     "LIBGL_ALWAYS_INDIRECT": "0"
   },
-  "forwardPorts": [
-    8080
-  ],
-  "mounts": [
-    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
-  ],
+  "forwardPorts": [],
   "customizations": {
     "vscode": {
       "settings": {
