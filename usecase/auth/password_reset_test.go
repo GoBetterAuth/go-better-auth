@@ -8,8 +8,8 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/domain"
 	"github.com/GoBetterAuth/go-better-auth/domain/user"
-	"github.com/GoBetterAuth/go-better-auth/internal/crypto"
 	gobetterauthtests "github.com/GoBetterAuth/go-better-auth/tests"
+	"github.com/GoBetterAuth/go-better-auth/vault"
 )
 
 func TestRequestPasswordReset_SendsEmailWithVerifyEndpoint(t *testing.T) {
@@ -68,7 +68,7 @@ func TestRequestPasswordReset_SendsEmailWithVerifyEndpoint(t *testing.T) {
 	}
 
 	// The stored token is the hashed version of the captured token
-	if resp.Verification.Token != crypto.HashVerificationToken(capturedToken) {
+	if resp.Verification.Token != vault.HashVerificationToken(capturedToken) {
 		t.Fatal("expected verification token to be the hashed version of the captured token")
 	}
 

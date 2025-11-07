@@ -1,16 +1,10 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
-	"strings"
 
 	"github.com/GoBetterAuth/go-better-auth/usecase/auth"
 )
-
-type SignOutRequest struct {
-	Token string `json:"token"`
-}
 
 // SignOutHandler handles POST /auth/signout
 func (h *AuthHandler) SignOutHandler(w http.ResponseWriter, r *http.Request) {
@@ -19,28 +13,11 @@ func (h *AuthHandler) SignOutHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authHeader := r.Header.Get("Authorization")
 	var token string
 
-	if authHeader != "" {
-		parts := strings.Split(authHeader, " ")
-		if len(parts) == 2 && parts[0] == "Bearer" {
-			token = parts[1]
-		}
-	}
-
-	if token == "" {
-		var req SignOutRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err == nil && req.Token != "" {
-			token = req.Token
-		}
-	}
-
-	if token == "" {
-		cookie, err := r.Cookie(h.cookieManager.GetSessionCookieName())
-		if err == nil {
-			token = cookie.Value
-		}
+	cookie, err := r.Cookie(h.cookieManager.GetSessionCookieName())
+	if err == nil {
+		token = cookie.Value
 	}
 
 	if token == "" {
@@ -48,10 +25,9 @@ func (h *AuthHandler) SignOutHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.service.SignOut(&auth.SignOutRequest{
+	if err := h.service.SignOut(&auth.SignOutRequest{
 		SessionToken: token,
-	})
-	if err != nil {
+	}); err != nil {
 		switch err.Error() {
 		case "session not found":
 			ErrorResponse(w, http.StatusUnauthorized, "invalid session")

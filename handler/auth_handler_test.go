@@ -15,9 +15,9 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/domain"
 	"github.com/GoBetterAuth/go-better-auth/domain/user"
 	"github.com/GoBetterAuth/go-better-auth/domain/verification"
-	"github.com/GoBetterAuth/go-better-auth/internal/crypto"
 	gobetterauthtests "github.com/GoBetterAuth/go-better-auth/tests"
 	"github.com/GoBetterAuth/go-better-auth/usecase/auth"
+	"github.com/GoBetterAuth/go-better-auth/vault"
 )
 
 func setupTestHandler(t *testing.T) *AuthHandler {
@@ -202,7 +202,6 @@ func TestSignInHandler_InvalidPassword(t *testing.T) {
 		t.Errorf("Expected status %d, got %d", http.StatusUnauthorized, signinW.Code)
 	}
 }
-
 func TestSignOutHandler_Valid(t *testing.T) {
 	handler := setupTestHandler(t)
 
@@ -227,17 +226,20 @@ func TestSignOutHandler_Valid(t *testing.T) {
 
 	handler.SignInHandler(signinW, signinHttpReq)
 
-	var signinResp Response
-	json.NewDecoder(signinW.Body).Decode(&signinResp)
-	signinData := signinResp.Data.(map[string]interface{})
-	token := signinData["token"].(string)
-
-	// Sign out
-	signoutReq := SignOutRequest{
-		Token: token,
+	// Extract session cookie from sign in response
+	cookies := signinW.Result().Cookies()
+	var sessionCookie *http.Cookie
+	for _, cookie := range cookies {
+		if cookie.Name == handler.cookieManager.GetSessionCookieName() {
+			sessionCookie = cookie
+			break
+		}
 	}
-	signoutBody, _ := json.Marshal(signoutReq)
-	signoutHttpReq := httptest.NewRequest(http.MethodPost, "/auth/signout", bytes.NewReader(signoutBody))
+	require.NotNil(t, sessionCookie, "Session cookie should be set")
+
+	// Sign out with session cookie
+	signoutHttpReq := httptest.NewRequest(http.MethodPost, "/auth/signout", nil)
+	signoutHttpReq.AddCookie(sessionCookie)
 	signoutW := httptest.NewRecorder()
 
 	handler.SignOutHandler(signoutW, signoutHttpReq)
@@ -362,7 +364,7 @@ func TestVerifyEmailGetHandler_ValidToken(t *testing.T) {
 	verificationToken := "valid-token-12345"
 	v := &verification.Verification{
 		Identifier: testUser.Email,
-		Token:      crypto.HashVerificationToken(verificationToken),
+		Token:      vault.HashVerificationToken(verificationToken),
 		Type:       verification.TypeEmailVerification,
 		ExpiresAt:  time.Now().Add(24 * time.Hour),
 		CreatedAt:  time.Now(),
@@ -458,7 +460,7 @@ func TestVerifyEmailGetHandler_ExpiredToken(t *testing.T) {
 	verificationToken := "expired-token-12345"
 	v := &verification.Verification{
 		Identifier: testUser.Email,
-		Token:      crypto.HashVerificationToken(verificationToken),
+		Token:      vault.HashVerificationToken(verificationToken),
 		Type:       verification.TypeEmailVerification,
 		ExpiresAt:  time.Now().Add(-1 * time.Hour), // Expired 1 hour ago
 		CreatedAt:  time.Now().Add(-2 * time.Hour),
@@ -525,7 +527,7 @@ func TestVerifyEmailGetHandler_CustomRedirectURL(t *testing.T) {
 	verificationToken := "valid-token-12345"
 	v := &verification.Verification{
 		Identifier: testUser.Email,
-		Token:      crypto.HashVerificationToken(verificationToken),
+		Token:      vault.HashVerificationToken(verificationToken),
 		Type:       verification.TypeEmailVerification,
 		ExpiresAt:  time.Now().Add(24 * time.Hour),
 		CreatedAt:  time.Now(),

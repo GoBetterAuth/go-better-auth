@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/GoBetterAuth/go-better-auth/domain/session"
-	"github.com/GoBetterAuth/go-better-auth/internal/crypto"
+	"github.com/GoBetterAuth/go-better-auth/vault"
 )
 
 // RefreshTokenRequest contains the request data for refreshing a session token
@@ -46,7 +46,7 @@ func (s *Service) RefreshToken(req *RefreshTokenRequest) (*RefreshTokenResponse,
 	}
 
 	// Generate new token
-	newToken, err := crypto.GenerateVerificationToken()
+	newToken, err := vault.GenerateVerificationToken()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate new token: %w", err)
 	}

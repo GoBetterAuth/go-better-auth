@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/GoBetterAuth/go-better-auth/domain/verification"
-	"github.com/GoBetterAuth/go-better-auth/internal/crypto"
+	"github.com/GoBetterAuth/go-better-auth/vault"
 )
 
 // verificationModel represents the GORM model for the verifications table
@@ -157,7 +157,7 @@ func (r *VerificationRepository) FindByHashedToken(plainToken string) (*verifica
 	}
 
 	for _, model := range models {
-		if crypto.VerifyVerificationToken(plainToken, model.Token) {
+		if vault.VerifyVerificationToken(plainToken, model.Token) {
 			return model.toDomain(), nil
 		}
 	}

@@ -7,8 +7,8 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/domain"
 	"github.com/GoBetterAuth/go-better-auth/domain/verification"
-	"github.com/GoBetterAuth/go-better-auth/internal/crypto"
 	gobetterauthtests "github.com/GoBetterAuth/go-better-auth/tests"
+	"github.com/GoBetterAuth/go-better-auth/vault"
 )
 
 func TestValidateSession_Valid(t *testing.T) {
@@ -274,12 +274,12 @@ func TestResetPassword_Valid(t *testing.T) {
 	repos.UserRepo.Create(testUser)
 
 	oldPassword := "OldPassword123!"
-	hashedOldPassword, _ := crypto.HashPassword(oldPassword)
+	hashedOldPassword, _ := vault.HashPassword(oldPassword)
 	testAccount := gobetterauthtests.CreateTestAccount(testUser.ID, &hashedOldPassword)
 	repos.AccountRepo.Create(testAccount)
 
 	resetToken := "reset-token-12345"
-	hashedResetToken := crypto.HashVerificationToken(resetToken)
+	hashedResetToken := vault.HashVerificationToken(resetToken)
 	v := &verification.Verification{
 		UserID:     testUser.ID,
 		Identifier: testUser.Email,
@@ -313,12 +313,12 @@ func TestResetPassword_Valid(t *testing.T) {
 		t.Fatal("Failed to find updated account")
 	}
 
-	matches, err := crypto.VerifyPassword(oldPassword, *updatedAccount.Password)
+	matches, err := vault.VerifyPassword(oldPassword, *updatedAccount.Password)
 	if err != nil || matches {
 		t.Error("Old password should not match")
 	}
 
-	matches, err = crypto.VerifyPassword(req.NewPassword, *updatedAccount.Password)
+	matches, err = vault.VerifyPassword(req.NewPassword, *updatedAccount.Password)
 	if err != nil || !matches {
 		t.Error("New password should match")
 	}
@@ -391,7 +391,7 @@ func TestVerifyEmail_Valid(t *testing.T) {
 	repos.UserRepo.Create(testUser)
 
 	verificationToken := "verify-token-12345"
-	hashedVerificationToken := crypto.HashVerificationToken(verificationToken)
+	hashedVerificationToken := vault.HashVerificationToken(verificationToken)
 	v := &verification.Verification{
 		Identifier: testUser.Email,
 		Token:      hashedVerificationToken,

@@ -10,7 +10,7 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/domain/account"
 	"github.com/GoBetterAuth/go-better-auth/domain/session"
 	"github.com/GoBetterAuth/go-better-auth/domain/user"
-	"github.com/GoBetterAuth/go-better-auth/internal/crypto"
+	"github.com/GoBetterAuth/go-better-auth/vault"
 	"github.com/google/uuid"
 )
 
@@ -123,7 +123,7 @@ func (s *Service) syncOAuthProfileData(ctx context.Context, userRecord *user.Use
 
 // createSessionForUser creates a new session for a user
 func (s *Service) createSessionForUser(userID string) (*session.Session, error) {
-	sessionToken, err := crypto.GenerateSessionToken()
+	sessionToken, err := vault.GenerateSessionToken()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate session token: %w", err)
 	}

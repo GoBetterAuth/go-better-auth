@@ -13,7 +13,6 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/domain/session"
 	"github.com/GoBetterAuth/go-better-auth/handler"
 	"github.com/GoBetterAuth/go-better-auth/infrastructure/migration"
-	"github.com/GoBetterAuth/go-better-auth/internal/crypto"
 	"github.com/GoBetterAuth/go-better-auth/middleware"
 	"github.com/GoBetterAuth/go-better-auth/repository"
 	"github.com/GoBetterAuth/go-better-auth/repository/cached"
@@ -24,13 +23,14 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/usecase/auth"
 	"github.com/GoBetterAuth/go-better-auth/usecase/ratelimit"
 	"github.com/GoBetterAuth/go-better-auth/usecase/security_protection"
+	"github.com/GoBetterAuth/go-better-auth/vault"
 )
 
 type Auth struct {
 	config          *domain.Config
-	secretGenerator *crypto.SecretGenerator
-	passwordHasher  *crypto.Argon2PasswordHasher
-	cipherManager   *crypto.CipherManager
+	secretGenerator *vault.SecretGenerator
+	passwordHasher  *vault.Argon2PasswordHasher
+	cipherManager   *vault.CipherManager
 	repositories    *gormrepo.Repositories
 	cookieManager   *handler.CookieManager
 }
@@ -48,9 +48,9 @@ func New(config *domain.Config) (*Auth, error) {
 		return nil, fmt.Errorf("invalid configuration: %s", validationResult.Error())
 	}
 
-	var cipherManager *crypto.CipherManager
+	var cipherManager *vault.CipherManager
 	if config.Secret != "" {
-		cm, err := crypto.NewCipherManager(config.Secret)
+		cm, err := vault.NewCipherManager(config.Secret)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create cipher manager: %w", err)
 		}
@@ -66,8 +66,8 @@ func New(config *domain.Config) (*Auth, error) {
 
 	auth := &Auth{
 		config:          config,
-		secretGenerator: crypto.NewSecretGenerator(),
-		passwordHasher:  crypto.NewArgon2PasswordHasher(),
+		secretGenerator: vault.NewSecretGenerator(),
+		passwordHasher:  vault.NewArgon2PasswordHasher(),
 		cipherManager:   cipherManager,
 		repositories:    repositories,
 		cookieManager:   cookieManager,
@@ -113,17 +113,17 @@ func (auth *Auth) RunMigrations(ctx context.Context) error {
 }
 
 // SecretGenerator returns the secret generator
-func (auth *Auth) SecretGenerator() *crypto.SecretGenerator {
+func (auth *Auth) SecretGenerator() *vault.SecretGenerator {
 	return auth.secretGenerator
 }
 
 // PasswordHasher returns the password hasher
-func (auth *Auth) PasswordHasher() *crypto.Argon2PasswordHasher {
+func (auth *Auth) PasswordHasher() *vault.Argon2PasswordHasher {
 	return auth.passwordHasher
 }
 
 // CipherManager returns the cipher manager for encryption and signing
-func (auth *Auth) CipherManager() *crypto.CipherManager {
+func (auth *Auth) CipherManager() *vault.CipherManager {
 	return auth.cipherManager
 }
 

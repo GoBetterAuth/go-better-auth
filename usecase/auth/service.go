@@ -6,8 +6,8 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/domain/session"
 	"github.com/GoBetterAuth/go-better-auth/domain/user"
 	"github.com/GoBetterAuth/go-better-auth/domain/verification"
-	"github.com/GoBetterAuth/go-better-auth/internal/crypto"
 	"github.com/GoBetterAuth/go-better-auth/usecase/security_protection"
+	"github.com/GoBetterAuth/go-better-auth/vault"
 )
 
 // PasswordHasher provides password hashing and verification functionality
@@ -20,11 +20,11 @@ type PasswordHasher interface {
 type DefaultPasswordHasher struct{}
 
 func (h *DefaultPasswordHasher) Hash(password string) (string, error) {
-	return crypto.HashPassword(password)
+	return vault.HashPassword(password)
 }
 
 func (h *DefaultPasswordHasher) Verify(password, hash string) (bool, error) {
-	return crypto.VerifyPassword(password, hash)
+	return vault.VerifyPassword(password, hash)
 }
 
 // CustomPasswordHasher implements PasswordHasher using custom functions from config

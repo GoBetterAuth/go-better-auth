@@ -10,7 +10,7 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/domain/account"
 	"github.com/GoBetterAuth/go-better-auth/domain/user"
 	"github.com/GoBetterAuth/go-better-auth/domain/verification"
-	"github.com/GoBetterAuth/go-better-auth/internal/crypto"
+	"github.com/GoBetterAuth/go-better-auth/vault"
 )
 
 // RequestPasswordResetRequest contains the request data for requesting a password reset
@@ -43,13 +43,13 @@ func (s *Service) RequestPasswordReset(ctx context.Context, req *RequestPassword
 		return nil, fmt.Errorf("user not found")
 	}
 
-	resetToken, err := crypto.GenerateVerificationToken()
+	resetToken, err := vault.GenerateVerificationToken()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate reset token: %w", err)
 	}
 
 	// Hash the token for secure storage
-	hashedToken := crypto.HashVerificationToken(resetToken)
+	hashedToken := vault.HashVerificationToken(resetToken)
 
 	expiresIn := 24 * time.Hour
 	if s.config.EmailAndPassword != nil && s.config.EmailAndPassword.Enabled && s.config.EmailAndPassword.ResetPasswordTokenExpiresIn > 0 {

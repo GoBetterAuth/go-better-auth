@@ -1,4 +1,4 @@
-package crypto
+package vault
 
 import (
 	"fmt"

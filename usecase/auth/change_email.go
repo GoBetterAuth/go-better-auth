@@ -9,7 +9,7 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/domain/user"
 	"github.com/GoBetterAuth/go-better-auth/domain/verification"
-	"github.com/GoBetterAuth/go-better-auth/internal/crypto"
+	"github.com/GoBetterAuth/go-better-auth/vault"
 )
 
 // ChangeEmailRequest contains the request data for requesting an email change
@@ -75,13 +75,13 @@ func (s *Service) ChangeEmail(ctx context.Context, req *ChangeEmailRequest) (*Ch
 	}
 
 	// Generate verification token
-	verificationToken, err := crypto.GenerateVerificationToken()
+	verificationToken, err := vault.GenerateVerificationToken()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate verification token: %w", err)
 	}
 
 	// Hash the token for secure storage
-	hashedToken := crypto.HashVerificationToken(verificationToken)
+	hashedToken := vault.HashVerificationToken(verificationToken)
 
 	// Create verification record with hashed token
 	// Store the user ID and new email for confirmation without requiring auth

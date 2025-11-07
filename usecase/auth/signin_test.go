@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/GoBetterAuth/go-better-auth/domain"
-	"github.com/GoBetterAuth/go-better-auth/internal/crypto"
 	gobetterauthtests "github.com/GoBetterAuth/go-better-auth/tests"
+	"github.com/GoBetterAuth/go-better-auth/vault"
 )
 
 func TestSignIn_Valid(t *testing.T) {
@@ -15,7 +15,7 @@ func TestSignIn_Valid(t *testing.T) {
 
 	// Create a user
 	password := "ValidPassword123!"
-	hashedPassword, err := crypto.HashPassword(password)
+	hashedPassword, err := vault.HashPassword(password)
 	if err != nil {
 		t.Fatalf("Failed to hash password: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestSignIn_InvalidPassword(t *testing.T) {
 
 	// Create a user with a specific password
 	password := "ValidPassword123!"
-	hashedPassword, _ := crypto.HashPassword(password)
+	hashedPassword, _ := vault.HashPassword(password)
 
 	testUser := gobetterauthtests.CreateTestUser()
 	repos.UserRepo.Create(testUser)
@@ -254,7 +254,7 @@ func TestSignIn_WithDisabledSignUp(t *testing.T) {
 
 	// Create a user
 	password := "ValidPassword123!"
-	hashedPassword, err := crypto.HashPassword(password)
+	hashedPassword, err := vault.HashPassword(password)
 	if err != nil {
 		t.Fatalf("Failed to hash password: %v", err)
 	}
@@ -309,7 +309,7 @@ func TestSignIn_ReturnsExistingSession(t *testing.T) {
 	defer cleanup()
 
 	password := "ValidPassword123!"
-	hashedPassword, err := crypto.HashPassword(password)
+	hashedPassword, err := vault.HashPassword(password)
 	if err != nil {
 		t.Fatalf("Failed to hash password: %v", err)
 	}

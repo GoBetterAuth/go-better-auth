@@ -12,7 +12,7 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/domain/session"
 	"github.com/GoBetterAuth/go-better-auth/domain/user"
 	"github.com/GoBetterAuth/go-better-auth/domain/verification"
-	"github.com/GoBetterAuth/go-better-auth/internal/crypto"
+	"github.com/GoBetterAuth/go-better-auth/vault"
 )
 
 // SignInRequest contains the request data for sign in
@@ -100,13 +100,12 @@ func (s *Service) SignIn(ctx context.Context, req *SignInRequest) (*SignInRespon
 	// Look for a valid (non-expired) session
 	for _, existingSession := range existingSessions {
 		if !existingSession.IsExpired() {
-			fmt.Println("returning existing session...")
 			return &SignInResponse{Session: existingSession, User: user}, nil
 		}
 	}
 
 	// Generate session token
-	sessionToken, err := crypto.GenerateSessionToken()
+	sessionToken, err := vault.GenerateSessionToken()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate session token: %w", err)
 	}
@@ -139,10 +138,10 @@ func (s *Service) SignIn(ctx context.Context, req *SignInRequest) (*SignInRespon
 	// Send verification email if configured and email not verified
 	if s.config.EmailVerification != nil && s.config.EmailVerification.SendOnSignIn && !user.EmailVerified && s.config.EmailVerification.SendVerificationEmail != nil {
 		// Generate verification token
-		verificationToken, err := crypto.GenerateVerificationToken()
+		verificationToken, err := vault.GenerateVerificationToken()
 		if err == nil {
 			// Hash the token for secure storage
-			hashedToken := crypto.HashVerificationToken(verificationToken)
+			hashedToken := vault.HashVerificationToken(verificationToken)
 
 			// Create verification record with hashed token
 			verificationCreated := &verification.Verification{

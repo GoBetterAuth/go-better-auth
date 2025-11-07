@@ -7,8 +7,8 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/domain/user"
 	"github.com/GoBetterAuth/go-better-auth/domain/verification"
-	"github.com/GoBetterAuth/go-better-auth/internal/crypto"
 	gobetterauthtests "github.com/GoBetterAuth/go-better-auth/tests"
+	"github.com/GoBetterAuth/go-better-auth/vault"
 )
 
 func TestVerifyEmailUnified(t *testing.T) {
@@ -193,7 +193,7 @@ func TestVerifyEmailUnified(t *testing.T) {
 				plainToken := tt.setupVerif.Token
 				// Create a copy for storing with hashed token
 				verificationToStore := *tt.setupVerif
-				verificationToStore.Token = crypto.HashVerificationToken(plainToken)
+				verificationToStore.Token = vault.HashVerificationToken(plainToken)
 				repos.VerificationRepo.Create(&verificationToStore)
 			}
 
@@ -273,7 +273,7 @@ func TestVerifyEmailUnified(t *testing.T) {
 						t.Fatal("expected reset token in response")
 					}
 
-					expectedHashedToken := crypto.HashVerificationToken(tt.setupVerif.Token)
+					expectedHashedToken := vault.HashVerificationToken(tt.setupVerif.Token)
 					if resp.Token != expectedHashedToken {
 						t.Fatalf("expected reset token to match hashed version")
 					}

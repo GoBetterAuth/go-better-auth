@@ -14,7 +14,7 @@ import (
 	"github.com/GoBetterAuth/go-better-auth/domain/session"
 	"github.com/GoBetterAuth/go-better-auth/domain/user"
 	"github.com/GoBetterAuth/go-better-auth/domain/verification"
-	"github.com/GoBetterAuth/go-better-auth/internal/crypto"
+	"github.com/GoBetterAuth/go-better-auth/vault"
 )
 
 // SignUpRequest contains the request data for sign up
@@ -104,7 +104,7 @@ func (s *Service) SignUp(ctx context.Context, req *SignUpRequest) (*SignUpRespon
 	}
 
 	// Generate session token
-	sessionToken, err := crypto.GenerateSessionToken()
+	sessionToken, err := vault.GenerateSessionToken()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate session token: %w", err)
 	}
@@ -135,14 +135,14 @@ func (s *Service) SignUp(ctx context.Context, req *SignUpRequest) (*SignUpRespon
 // sendVerificationEmailAsync sends the verification email asynchronously
 func (s *Service) sendVerificationEmailAsync(ctx context.Context, user *user.User, callbackURL *string) {
 	// Generate verification token
-	verificationToken, err := crypto.GenerateVerificationToken()
+	verificationToken, err := vault.GenerateVerificationToken()
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to generate verification token", "user_id", user.ID, "error", err)
 		return
 	}
 
 	// Hash the token for secure storage
-	hashedToken := crypto.HashVerificationToken(verificationToken)
+	hashedToken := vault.HashVerificationToken(verificationToken)
 
 	// Create verification record with hashed token
 	newVerification := &verification.Verification{

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/GoBetterAuth/go-better-auth/internal/crypto"
+	"github.com/GoBetterAuth/go-better-auth/vault"
 )
 
 // OAuthState represents an OAuth state parameter with metadata
@@ -22,7 +22,7 @@ type OAuthState struct {
 // OAuthStateManager manages OAuth state parameters with CSRF protection.
 // It now supports pluggable storage backends and secret rotation for production deployments.
 type OAuthStateManager struct {
-	cipher  *crypto.VersionedCipherManager
+	cipher  *vault.VersionedCipherManager
 	storage OAuthStateStorage
 	ttl     time.Duration
 }
@@ -48,7 +48,7 @@ func NewOAuthStateManagerWithStorage(secret string, ttl time.Duration, storage O
 	}
 
 	// Create versioned cipher manager for encryption, signing, and secret rotation
-	cipher, err := crypto.NewVersionedCipherManager(secret, 5) // Keep last 5 secret versions
+	cipher, err := vault.NewVersionedCipherManager(secret, 5) // Keep last 5 secret versions
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cipher manager: %w", err)
 	}
@@ -67,7 +67,7 @@ func (m *OAuthStateManager) GenerateState(providerID string, redirectTo string, 
 	}
 
 	// Generate random state token
-	randomState, err := crypto.GenerateToken(24)
+	randomState, err := vault.GenerateToken(24)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate random state: %w", err)
 	}

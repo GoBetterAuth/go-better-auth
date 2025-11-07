@@ -8,7 +8,7 @@ import (
 
 	"github.com/GoBetterAuth/go-better-auth/domain/user"
 	"github.com/GoBetterAuth/go-better-auth/domain/verification"
-	"github.com/GoBetterAuth/go-better-auth/internal/crypto"
+	"github.com/GoBetterAuth/go-better-auth/vault"
 )
 
 // SendEmailVerificationRequest contains the request data for sending an email verification
@@ -37,13 +37,13 @@ func (s *Service) SendEmailVerification(ctx context.Context, req *SendEmailVerif
 	}
 
 	// Generate verification token
-	verificationToken, err := crypto.GenerateVerificationToken()
+	verificationToken, err := vault.GenerateVerificationToken()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate verification token: %w", err)
 	}
 
 	// Hash the token for secure storage
-	hashedToken := crypto.HashVerificationToken(verificationToken)
+	hashedToken := vault.HashVerificationToken(verificationToken)
 
 	// Create verification record with hashed token
 	verification := &verification.Verification{
